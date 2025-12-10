@@ -4912,7 +4912,7 @@ class _HapkeDrawer extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.all(12),
               child: Text(
-                'Hapke • demo build',
+                'Hapke • live build',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey),
               ),
