@@ -527,7 +527,7 @@ class OrderSummary {
   };
 }
 
-/// ---------------- Demo data ----------------
+/// ---------------- Demo data (verwijderd; alleen API) ----------------
 final demoRestaurants = <Restaurant>[];
 
 // Images per gerecht (fallback naar restaurantfoto als ontbreekt)
@@ -637,7 +637,7 @@ class _HapkeAppState extends State<HapkeApp> {
   String? _authToken;
   String? _pendingOrderId;
   bool _handlingUnauthorized = false;
-  List<Restaurant> _restaurants = List<Restaurant>.from(demoRestaurants);
+  List<Restaurant> _restaurants = [];
   bool _loadingRestaurants = false;
 
   int get cartCount => _cart.fold(0, (n, ci) => n + ci.qty);
@@ -923,25 +923,14 @@ class _HapkeAppState extends State<HapkeApp> {
   }
 
   List<Restaurant> _mergeRestaurantLists(List<Restaurant> fetched) {
-    final demoIds = demoRestaurants.map((r) => r.id).toSet();
+    // Geen demo-restaurants meer; toon alleen API-data
     final seen = <String>{};
     final result = <Restaurant>[];
-
     for (final restaurant in fetched) {
-      if (demoIds.contains(restaurant.id)) {
-        continue;
-      }
       if (seen.add(restaurant.id)) {
         result.add(restaurant);
       }
     }
-
-    for (final restaurant in demoRestaurants) {
-      if (seen.add(restaurant.id)) {
-        result.add(restaurant);
-      }
-    }
-
     return result;
   }
 
