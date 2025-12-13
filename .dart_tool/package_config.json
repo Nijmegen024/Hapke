@@ -57,7 +57,7 @@
     },
     {
       "name": "crypto",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/crypto-3.0.6",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/crypto-3.0.7",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -147,7 +147,7 @@
     },
     {
       "name": "http",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/http-1.5.0",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/http-1.6.0",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -159,7 +159,7 @@
     },
     {
       "name": "image",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/image-4.5.4",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/image-4.6.0",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -231,7 +231,7 @@
     },
     {
       "name": "path_provider_android",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/path_provider_android-2.2.18",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/path_provider_android-2.2.19",
       "packageUri": "lib/",
       "languageVersion": "3.7"
     },
@@ -351,9 +351,9 @@
     },
     {
       "name": "url_launcher_linux",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.1",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.2",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.8"
     },
     {
       "name": "url_launcher_macos",
@@ -375,9 +375,9 @@
     },
     {
       "name": "url_launcher_windows",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.4",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.5",
       "packageUri": "lib/",
-      "languageVersion": "3.4"
+      "languageVersion": "3.8"
     },
     {
       "name": "vector_math",
@@ -399,7 +399,7 @@
     },
     {
       "name": "win32",
-      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/win32-5.14.0",
+      "rootUri": "file:///Users/aerenkooijman/.pub-cache/hosted/pub.dev/win32-5.15.0",
       "packageUri": "lib/",
       "languageVersion": "3.8"
     },
