@@ -1,5 +1,4 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '12.0'
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -35,6 +34,7 @@ pre_install do |_installer|
   {
     'flutter_secure_storage' => File.expand_path(File.join(__dir__, 'Plugins', 'flutter_secure_storage')),
     'url_launcher_ios' => File.expand_path(File.join(__dir__, 'Plugins', 'url_launcher_ios')),
+    'path_provider_foundation' => File.expand_path(File.join(__dir__, 'Plugins', 'path_provider_foundation')),
   }.each do |name, source|
     target = File.join(plugins_dir, name)
     next unless File.directory?(source)
@@ -57,4 +57,3 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
   end
 end
-platform :ios, '12.0'
