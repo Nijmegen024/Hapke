@@ -144,11 +144,13 @@ class MenuItem {
   final String name;
   final String description;
   final int priceCents;
+  final String? imageUrl;
   const MenuItem({
     required this.id,
     required this.name,
     required this.description,
     required this.priceCents,
+    this.imageUrl,
   });
 }
 
@@ -164,12 +166,15 @@ List<MenuItem> _parseMenuItemsFromApi(dynamic rawMenu) {
     if (id.isEmpty || name.isEmpty) continue;
     final description = (entry['description'] ?? '').toString().trim();
     final priceCents = _readPriceCents(entry);
+    final rawImage = (entry['imageUrl'] ?? '').toString().trim();
+    final imageUrl = rawImage.isEmpty ? null : rawImage;
     parsed.add(
       MenuItem(
         id: id,
         name: name,
         description: description,
         priceCents: priceCents,
+        imageUrl: imageUrl,
       ),
     );
   }
@@ -3035,6 +3040,21 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
                 vertical: 6,
                 horizontal: 16,
               ),
+              leading: m.imageUrl == null
+                  ? null
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        m.imageUrl!,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.image_not_supported,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
               title: Text(
                 m.name,
                 style: const TextStyle(
