@@ -5751,6 +5751,7 @@ class _FriendsTabState extends State<FriendsTab> {
   }
 
   Future<List<FriendSummary>> _fetchFriends() async {
+    // Zorg dat token wordt meegegeven; apiClient voegt Authorization toe
     final res = await apiClient.get(
       Uri.parse('$apiBase/friends'),
       headers: {'Accept': 'application/json'},
@@ -5770,6 +5771,7 @@ class _FriendsTabState extends State<FriendsTab> {
   }
 
   Future<Map<String, List<FriendRequestSummary>>> _fetchPending() async {
+    // Zorg dat token wordt meegegeven; apiClient voegt Authorization toe
     final res = await apiClient.get(
       Uri.parse('$apiBase/friends/requests'),
       headers: {'Accept': 'application/json'},
