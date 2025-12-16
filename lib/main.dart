@@ -5070,547 +5070,219 @@ class _SearchPill extends StatelessWidget {
   }
 }
 
+class _VideoItem {
+  final String id;
+  final String restaurantName;
+  final String title;
+  final String description;
+  final String videoUrl;
+  final String? thumbUrl;
+  _VideoItem({
+    required this.id,
+    required this.restaurantName,
+    required this.title,
+    required this.description,
+    required this.videoUrl,
+    this.thumbUrl,
+  });
+}
+
 class VideosTab extends StatefulWidget {
   final List<Restaurant> restaurants;
-  final void Function(Restaurant, MenuItem) onAdd;
-  final List<CartItem> cartItems;
-  final Future<void> Function(BuildContext) openCartModal;
-  final HapkeUser? currentUser;
-  final Future<void> Function()? onLogin;
-  const VideosTab({
-    super.key,
-    required this.restaurants,
-    required this.onAdd,
-    required this.cartItems,
-    required this.openCartModal,
-    this.currentUser,
-    this.onLogin,
-  });
+  const VideosTab({super.key, required this.restaurants});
 
   @override
   State<VideosTab> createState() => _VideosTabState();
 }
 
 class _VideosTabState extends State<VideosTab> {
-  // onthoud welke menu-items geliked zijn en welke comments er zijn
-  final Set<String> _liked = <String>{};
-  final Map<String, List<String>> _comments = <String, List<String>>{};
+  final Map<String, List<_VideoItem>> _videos = {};
+  bool _loadingAll = false;
+  String? _error;
 
-  void _toggleLike(MenuItem? item) {
-    if (item == null) return;
+  @override
+  void initState() {
+    super.initState();
+    _loadAllVideos();
+  }
+
+  Future<void> _loadAllVideos() async {
     setState(() {
-      if (_liked.contains(item.id)) {
-        _liked.remove(item.id);
-      } else {
-        _liked.add(item.id);
-      }
+      _loadingAll = true;
+      _error = null;
     });
+    try {
+      for (final r in widget.restaurants) {
+        await _loadVideos(r.id, r.name);
+      }
+    } catch (e) {
+      _error = 'Video’s laden mislukt: $e';
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAll = false);
+      }
+    }
   }
 
-  Future<void> _addComment(BuildContext context, MenuItem? item) async {
-    if (item == null) return;
-    final controller = TextEditingController();
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Reageer op ${item.name}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: 'Schrijf je comment...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () {
-                  final text = controller.text.trim();
-                  if (text.isNotEmpty) {
-                    setState(() {
-                      _comments
-                          .putIfAbsent(item.id, () => <String>[])
-                          .add(text);
-                    });
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Comment geplaatst')),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.send),
-                label: const Text('Opslaan'),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-    // Do not dispose controller here.
-  }
-
-  Future<void> _sendToFriend(
-    BuildContext context,
-    Restaurant r,
-    MenuItem? m,
-  ) async {
-    if (widget.currentUser == null) {
-      await widget.onLogin?.call();
-      return;
-    }
-    if (m == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Geen gerecht geselecteerd')),
-      );
-      return;
-    }
-    List<FriendSummary> friends = const <FriendSummary>[];
+  Future<void> _loadVideos(String restaurantId, String restaurantName) async {
     try {
       final res = await apiClient.get(
-        Uri.parse('$apiBase/friends'),
+        Uri.parse('$apiBase/restaurants/$restaurantId/videos'),
         headers: {'Accept': 'application/json'},
       );
-      if (res.statusCode == 401) {
-        await widget.onLogin?.call();
-        return;
-      }
-      if (res.statusCode != 200) {
-        throw Exception(extractErrorMessage(res));
-      }
-      final decoded = jsonDecode(res.body);
-      if (decoded is List) {
-        friends = decoded
-            .whereType<Map<String, dynamic>>()
-            .map(FriendSummary.fromJson)
-            .where((f) => f.user.id.isNotEmpty)
-            .toList();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Kon vrienden niet ophalen: $e')));
-      return;
-    }
-
-    if (friends.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Je hebt nog geen vrienden om dit mee te delen'),
-        ),
-      );
-      return;
-    }
-
-    String? selectedId;
-    await showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Stuur naar vriend',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final list = <_VideoItem>[];
+        if (data is List) {
+          for (final v in data) {
+            if (v is! Map<String, dynamic>) continue;
+            final id = (v['id'] ?? '').toString().trim();
+            final title = (v['title'] ?? '').toString().trim();
+            final url = (v['videoUrl'] ?? '').toString().trim();
+            if (id.isEmpty || title.isEmpty || url.isEmpty) continue;
+            final rawThumb = (v['thumbUrl'] ?? '').toString().trim();
+            list.add(
+              _VideoItem(
+                id: id,
+                restaurantName: restaurantName,
+                title: title,
+                description: (v['description'] ?? '').toString(),
+                videoUrl: url,
+                thumbUrl: rawThumb.isEmpty ? null : rawThumb,
               ),
-              for (final f in friends)
-                RadioListTile<String>(
-                  title: Text(f.user.displayName),
-                  subtitle: Text(f.user.email),
-                  value: f.user.id,
-                  groupValue: selectedId,
-                  onChanged: (v) {
-                    selectedId = v;
-                    Navigator.pop(ctx);
-                  },
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-    if (selectedId == null) {
-      return;
-    }
-
-    final friend = friends.firstWhere(
-      (f) => f.user.id == selectedId,
-      orElse: () => friends.first,
-    );
-    final message =
-        'Deel: ${r.name} • ${m.name} • ${_formatPrice(m.priceCents)}';
-    try {
-      final chatRes = await apiClient.post(
-        Uri.parse('$apiBase/chats/direct/${friend.user.id}'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({}),
-      );
-      if (chatRes.statusCode != 200 && chatRes.statusCode != 201) {
-        throw Exception(extractErrorMessage(chatRes));
+            );
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _videos[restaurantId] = list;
+          });
+        }
+      } else {
+        setState(() {
+          _error = 'Video’s laden mislukt (${res.statusCode})';
+        });
       }
-      final chatJson = jsonDecode(chatRes.body);
-      if (chatJson is! Map<String, dynamic>) {
-        throw Exception('Ongeldig antwoord van server');
-      }
-      final thread = ChatThread.fromJson(chatJson, widget.currentUser!.id);
-
-      final sendRes = await apiClient.post(
-        Uri.parse('$apiBase/chats/${thread.id}/messages'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({'content': message}),
-      );
-      if (sendRes.statusCode != 200 && sendRes.statusCode != 201) {
-        throw Exception(extractErrorMessage(sendRes));
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Verstuurd naar ${friend.user.displayName}')),
-      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Kon niet versturen: $e')));
+      setState(() {
+        _error = 'Video’s laden mislukt: $e';
+      });
     }
+  }
+
+  List<_VideoItem> _allVideos() {
+    final flattened = <_VideoItem>[];
+    for (final list in _videos.values) {
+      flattened.addAll(list);
+    }
+    return flattened;
   }
 
   @override
   Widget build(BuildContext context) {
-    final restaurants = widget.restaurants;
+    final videos = _allVideos();
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF14B8A6),
-        clipBehavior: Clip.none,
-        title: Transform.scale(
-          scale: 1.15,
-          child: SizedBox(
-            height: kToolbarHeight * 0.88,
-            child: Image.asset(
-              'assets/icons/hapke_logo.png',
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Center(
-                child: Text(
-                  'Hapke',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        title: const Text("Video's"),
         centerTitle: true,
       ),
-      body: PageView.builder(
-        scrollDirection: Axis.vertical,
-        itemCount: restaurants.length,
-        itemBuilder: (context, rIndex) {
-          final r = restaurants[rIndex];
-
-          // voor elke restaurantpagina houden we het huidige gerecht bij
-          final ValueNotifier<MenuItem?> selectedItem =
-              ValueNotifier<MenuItem?>(r.menu.isNotEmpty ? r.menu.first : null);
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              ValueListenableBuilder<MenuItem?>(
-                valueListenable: selectedItem,
-                builder: (context, current, _) {
-                  // primaire gerechtfoto (als beschikbaar), anders restaurantfoto
-                  final primary = current == null
-                      ? r.imageUrl
-                      : (_dishImages[current.id] ?? r.imageUrl);
-
-                  // probeer eerst de gerechtfoto; als die faalt, val terug op restaurantfoto
-                  return Image.network(
-                    primary,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Image.network(
-                      r.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const ColoredBox(
-                        color: Colors.black12,
-                        child: Center(child: Icon(Icons.fastfood, size: 48)),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              Positioned.fill(
-                child: Container(color: Colors.black.withOpacity(0.35)),
-              ),
-
-              // VOORGROND: TEKST OVER DE FOTO
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Boven: restaurantinfo
-                      Text(
-                        r.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        r.cuisine,
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 18),
-                          const SizedBox(width: 4),
-                          Text(
-                            r.rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
+      body: _loadingAll
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _ErrorState(
+                  message: _error!,
+                  onRetry: _loadAllVideos,
+                )
+              : videos.isEmpty
+                  ? const Center(
+                      child: Text('Nog geen video\'s beschikbaar'),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadAllVideos,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: videos.length,
+                        itemBuilder: (context, index) {
+                          final v = videos[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(
-                            Icons.timer,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            r.eta,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // Onder: geselecteerd gerecht
-                      ValueListenableBuilder<MenuItem?>(
-                        valueListenable: selectedItem,
-                        builder: (context, m, _) {
-                          if (m == null) {
-                            return const Text(
-                              'Geen menu-items beschikbaar',
-                              style: TextStyle(color: Colors.white70),
-                            );
-                          }
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                m.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                m.description,
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _formatPrice(m.priceCents),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        final videosContext = context;
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => RestaurantDetailPage(
-                                              restaurant: r,
-                                              cartItems: widget.cartItems,
-                                              openCartModal:
-                                                  widget.openCartModal,
-                                              onAdd: (m) {
-                                                widget.onAdd(r, m);
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(
-                                                    videosContext,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        '${m.name} toegevoegd aan MANDDD!!',
-                                                      ),
-                                                      duration: const Duration(
-                                                        milliseconds: 900,
-                                                      ),
-                                                    ),
-                                                  );
-                                                  setState(() {});
-                                                }
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      icon: const Icon(
-                                        Icons.shopping_bag_outlined,
-                                      ),
-                                      label: const Text('Restaurant'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (v.thumbUrl != null)
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(14),
+                                    ),
+                                    child: Image.network(
+                                      v.thumbUrl!,
+                                      height: 180,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const SizedBox.shrink(),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(
-                                          color: Colors.white,
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      16, 12, 16, 10),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        v.title,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
                                         ),
-                                        foregroundColor: Colors.white,
                                       ),
-                                      onPressed: () {
-                                        widget.onAdd(r, m);
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Toegevoegd aan MANDDD!!',
-                                            ),
-                                            duration: Duration(
-                                              milliseconds: 900,
-                                            ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        v.restaurantName,
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      if (v.description.trim().isNotEmpty)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(top: 6),
+                                          child: Text(
+                                            v.description,
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        );
-                                      },
-                                      icon: const Icon(
-                                        Icons.add,
-                                        color: Colors.white,
+                                        ),
+                                      const SizedBox(height: 10),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            final uri = Uri.parse(v.videoUrl);
+                                            if (await canLaunchUrl(uri)) {
+                                              await launchUrl(uri,
+                                                  mode: LaunchMode
+                                                      .externalApplication);
+                                            }
+                                          },
+                                          icon: const Icon(Icons.play_arrow),
+                                          label: const Text('Bekijken'),
+                                        ),
                                       ),
-                                      label: const Text(
-                                        'Toevoegen',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Onzichtbare horizontale pager om van gerecht te wisselen
-              Align(
-                alignment: Alignment.center,
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.65,
-                  child: PageView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: r.menu.length,
-                    onPageChanged: (mIndex) {
-                      if (r.menu.isNotEmpty)
-                        selectedItem.value = r.menu[mIndex];
-                    },
-                    itemBuilder: (_, __) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-
-              // Rechter zij-actieknoppen (like, comment, versturen) voor HUIDIG gerecht
-              Positioned(
-                right: 16,
-                bottom: 120,
-                child: ValueListenableBuilder<MenuItem?>(
-                  valueListenable: selectedItem,
-                  builder: (context, currentM, _) {
-                    final isLiked =
-                        currentM != null && _liked.contains(currentM.id);
-                    final commentCount = currentM == null
-                        ? 0
-                        : (_comments[currentM.id]?.length ?? 0);
-                    return Column(
-                      children: [
-                        _RoundIconButton(
-                          icon: isLiked
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: isLiked ? Colors.red : Colors.white70,
-                          onTap: () => _toggleLike(currentM),
-                        ),
-                        const SizedBox(height: 12),
-                        _RoundIconButton(
-                          icon: Icons.chat_bubble_outline,
-                          color: Colors.white70,
-                          badgeCount: commentCount,
-                          onTap: () => _addComment(context, currentM),
-                        ),
-                        const SizedBox(height: 12),
-                        _RoundIconButton(
-                          icon: Icons.send_outlined,
-                          color: Colors.white70,
-                          onTap: () => _sendToFriend(context, r, currentM),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                    ),
     );
   }
 }
