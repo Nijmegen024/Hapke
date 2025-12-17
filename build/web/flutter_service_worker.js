@@ -3,7 +3,7 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"flutter_bootstrap.js": "7437a130aacdc9be40f0980b67c4bd73",
+const RESOURCES = {"flutter_bootstrap.js": "2f25d7dd87ea588ff28d10b19ef95103",
 "version.json": "62693fad600d06931c8e161590cc458c",
 "index.html": "c0667c8b19f47321b04ee2f174f347bb",
 "/": "c0667c8b19f47321b04ee2f174f347bb",
@@ -23,7 +23,7 @@ const RESOURCES = {"flutter_bootstrap.js": "7437a130aacdc9be40f0980b67c4bd73",
 "assets/shaders/ink_sparkle.frag": "ecc85a2e95f5e9f53123dcaf8cb9b6ce",
 "assets/AssetManifest.bin": "f7f7afd118c62fd6f0953c148942f2c9",
 "assets/fonts/MaterialIcons-Regular.otf": "a105ef6eaca955d718b5e5cff92fde30",
-"assets/assets/icons/hapke_logo.png": "1b4a0efa77ff5f89f370f31ba995e94b",
+"assets/assets/icons/hapke_logo.png": "443cf3181cd66de349d6ab7db998fd77",
 "canvaskit/skwasm.js": "ea559890a088fe28b4ddf70e17e60052",
 "canvaskit/skwasm.js.symbols": "e72c79950c8a8483d826a7f0560573a1",
 "canvaskit/canvaskit.js.symbols": "bdcd3835edf8586b6d6edfce8749fb77",
