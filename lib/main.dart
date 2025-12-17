@@ -816,9 +816,7 @@ class _HapkeAppState extends State<HapkeApp> {
     final deliveryRaw = json['deliveryCost'];
     final deliveryFee = deliveryRaw is num ? deliveryRaw.toDouble() : null;
     final imageUrlRaw = (json['imageUrl'] ?? '').toString().trim();
-    final imageUrl = imageUrlRaw.isEmpty
-        ? 'https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80'
-        : imageUrlRaw;
+    final imageUrl = imageUrlRaw.isEmpty ? '' : imageUrlRaw;
 
     final menuItems = _parseMenuItemsFromApi(json['menu']);
 
@@ -1196,14 +1194,7 @@ class _RootTabsState extends State<_RootTabs> {
         onLoggedIn: widget.onLoggedIn,
         onLogout: widget.onLogout,
       ),
-      VideosTab(
-        restaurants: widget.restaurants,
-        onAdd: widget.onAdd,
-        cartItems: widget.cartItems,
-        openCartModal: _openCartModal,
-        currentUser: widget.currentUser,
-        onLogin: _openLogin,
-      ),
+      VideosTab(restaurants: widget.restaurants),
       CartPage(
         items: widget.cartItems,
         totalCents: widget.cartItems.fold(
@@ -5190,9 +5181,22 @@ class _VideosTabState extends State<VideosTab> {
       body: _loadingAll
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _ErrorState(
-                  message: _error!,
-                  onRetry: _loadAllVideos,
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: _loadAllVideos,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Opnieuw proberen'),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
               : videos.isEmpty
                   ? const Center(

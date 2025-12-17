@@ -89930,7 +89930,7 @@ j=b.h(a0,"deliveryCost")
 i=typeof j=="number"?j:null
 a=b.h(a0,"imageUrl")
 h=B.c.br(J.aH(a==null?"":a))
-g=h.length===0?"https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80":h
+g=h.length===0?"":h
 f=A.aK_(b.h(a0,"menu"))
 b=q.length===0?d:q
 a=p.length===0?"Nieuw":p
