@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -804,9 +805,10 @@ class _HapkeAppState extends State<HapkeApp> {
     if (rawId.isEmpty || rawName.isEmpty) {
       return null;
     }
-    final cuisine = (json['cuisine'] ?? json['description'] ?? 'Nog in te vullen')
-        .toString()
-        .trim();
+    final cuisine =
+        (json['cuisine'] ?? json['description'] ?? 'Nog in te vullen')
+            .toString()
+            .trim();
     final category = (json['category'] ?? 'Nieuw').toString().trim();
     final eta = (json['eta'] ?? '35–45 min').toString().trim();
     final ratingValue = double.tryParse((json['rating'] ?? '').toString());
@@ -970,8 +972,9 @@ class _HapkeAppState extends State<HapkeApp> {
         }
         final uri = Uri.tryParse(name.startsWith('/') ? name : '/$name');
         if (uri != null) {
-          final segments =
-              uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+          final segments = uri.pathSegments
+              .where((segment) => segment.isNotEmpty)
+              .toList();
           if (segments.length == 2 && segments.first == 'verify') {
             final token = segments[1];
             return MaterialPageRoute(
@@ -2537,8 +2540,9 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: Colors.black54,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                         child: Column(
                                           crossAxisAlignment:
@@ -2554,8 +2558,7 @@ class _HomePageState extends State<HomePage> {
                                                 ),
                                                 const SizedBox(width: 4),
                                                 Text(
-                                                  r.rating
-                                                      .toStringAsFixed(1),
+                                                  r.rating.toStringAsFixed(1),
                                                   style: const TextStyle(
                                                     color: Colors.white,
                                                   ),
@@ -2638,8 +2641,12 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                              padding: const EdgeInsets.fromLTRB(
+                                12,
+                                12,
+                                12,
+                                12,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -2722,6 +2729,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
       }
     }
   }
+
   Future<void> _openCart() async {
     await widget.openCartModal(context);
     if (mounted) setState(() {});
@@ -3130,11 +3138,7 @@ class MenuItemCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: Colors.black.withOpacity(0.65),
                     ),
-                    child: const Icon(
-                      Icons.add,
-                      size: 20,
-                      color: Colors.white,
-                    ),
+                    child: const Icon(Icons.add, size: 20, color: Colors.white),
                   ),
                 ),
               ),
@@ -3429,7 +3433,8 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
       'items': _itemPayload,
       'paymentId': paymentId,
       if (widget.email != null) 'email': widget.email,
-      if (widget.items.isNotEmpty) 'restaurantId': widget.items.first.restaurant.id,
+      if (widget.items.isNotEmpty)
+        'restaurantId': widget.items.first.restaurant.id,
     };
     debugPrint('HAPKE ORDER ➜ POST $apiBase/orders body=${jsonEncode(body)}');
     try {
@@ -4274,8 +4279,8 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
       if (!mounted) return;
       final data = _tryParseJson(res.body);
       if (res.statusCode == 200) {
-        final msg =
-            (data?['message'] ?? 'Je account is geactiveerd!').toString();
+        final msg = (data?['message'] ?? 'Je account is geactiveerd!')
+            .toString();
         setState(() {
           _loading = false;
           _success = true;
@@ -4285,9 +4290,9 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
           _message = msg;
         });
       } else {
-        final msg = (data?['message'] ??
-                'Verificatie mislukt (${res.statusCode}).')
-            .toString();
+        final msg =
+            (data?['message'] ?? 'Verificatie mislukt (${res.statusCode}).')
+                .toString();
         setState(() {
           _loading = false;
           _success = false;
@@ -4320,8 +4325,9 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final successTitle =
-        _alreadyVerified ? 'Account is al geactiveerd' : 'Je account is geactiveerd!';
+    final successTitle = _alreadyVerified
+        ? 'Account is al geactiveerd'
+        : 'Je account is geactiveerd!';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Account verifiëren')),
@@ -4343,87 +4349,82 @@ class _VerifyAccountPageState extends State<VerifyAccountPage> {
                       ],
                     )
                   : _success
-                      ? Column(
-                          key: const ValueKey('success'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline,
-                              color: Colors.green.shade600,
-                              size: 72,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              successTitle,
-                              style: theme.textTheme.headlineSmall,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _message ?? 'Je account is geactiveerd!',
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).pushNamedAndRemoveUntil(
-                                  '/',
-                                  (route) => false,
-                                );
-                              },
-                              child: const Text('Ga naar Hapke'),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginPage(),
-                                  ),
-                                );
-                              },
-                              child: const Text('Inloggen'),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          key: const ValueKey('error'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Colors.red.shade600,
-                              size: 72,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Verificatie mislukt',
-                              style: theme.textTheme.headlineSmall,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 12),
-                            if (_error != null)
-                              Text(
-                                _error!,
-                                textAlign: TextAlign.center,
-                              ),
-                            const SizedBox(height: 24),
-                            ElevatedButton(
-                              onPressed: _verify,
-                              child: const Text('Probeer opnieuw'),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).pushNamedAndRemoveUntil(
-                                  '/',
-                                  (route) => false,
-                                );
-                              },
-                              child: const Text('Terug naar home'),
-                            ),
-                          ],
+                  ? Column(
+                      key: const ValueKey('success'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: Colors.green.shade600,
+                          size: 72,
                         ),
+                        const SizedBox(height: 16),
+                        Text(
+                          successTitle,
+                          style: theme.textTheme.headlineSmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _message ?? 'Je account is geactiveerd!',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(
+                              context,
+                            ).pushNamedAndRemoveUntil('/', (route) => false);
+                          },
+                          child: const Text('Ga naar Hapke'),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const LoginPage(),
+                              ),
+                            );
+                          },
+                          child: const Text('Inloggen'),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      key: const ValueKey('error'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: Colors.red.shade600,
+                          size: 72,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Verificatie mislukt',
+                          style: theme.textTheme.headlineSmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        if (_error != null)
+                          Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: _verify,
+                          child: const Text('Probeer opnieuw'),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(
+                              context,
+                            ).pushNamedAndRemoveUntil('/', (route) => false);
+                          },
+                          child: const Text('Terug naar home'),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),
@@ -4576,7 +4577,8 @@ class _LoginPageState extends State<LoginPage> {
         });
       } else {
         final data = _parseJson(res.body);
-        final msg = (data?['message'] ?? 'Opnieuw versturen mislukt').toString();
+        final msg = (data?['message'] ?? 'Opnieuw versturen mislukt')
+            .toString();
         setState(() {
           _resendMessage = msg;
         });
@@ -5097,10 +5099,27 @@ class _VideosTabState extends State<VideosTab> {
     _loadAllVideos();
   }
 
+  @override
+  void didUpdateWidget(covariant VideosTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final oldIds = oldWidget.restaurants.map((r) => r.id).toSet();
+    final newIds = widget.restaurants.map((r) => r.id).toSet();
+    final idsChanged = !setEquals(oldIds, newIds);
+
+    // This tab lives inside an IndexedStack; initState runs once. Restaurants
+    // are loaded async in the parent, so we reload videos when the restaurant
+    // list arrives/changes.
+    if (idsChanged && widget.restaurants.isNotEmpty) {
+      _loadAllVideos();
+    }
+  }
+
   Future<void> _loadAllVideos() async {
     setState(() {
       _loadingAll = true;
       _error = null;
+      _videos.clear();
     });
     try {
       for (final r in widget.restaurants) {
@@ -5181,112 +5200,109 @@ class _VideosTabState extends State<VideosTab> {
       body: _loadingAll
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _loadAllVideos,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Opnieuw proberen'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : videos.isEmpty
+          ? const Center(child: Text('Nog geen video\'s beschikbaar'))
+          : RefreshIndicator(
+              onRefresh: _loadAllVideos,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: videos.length,
+                itemBuilder: (context, index) {
+                  final v = videos[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          onPressed: _loadAllVideos,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Opnieuw proberen'),
+                        if (v.thumbUrl != null)
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(14),
+                            ),
+                            child: Image.network(
+                              v.thumbUrl!,
+                              height: 180,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                v.title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                v.restaurantName,
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (v.description.trim().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    v.description,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final uri = Uri.parse(v.videoUrl);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(
+                                        uri,
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.play_arrow),
+                                  label: const Text('Bekijken'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                )
-              : videos.isEmpty
-                  ? const Center(
-                      child: Text('Nog geen video\'s beschikbaar'),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadAllVideos,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: videos.length,
-                        itemBuilder: (context, index) {
-                          final v = videos[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (v.thumbUrl != null)
-                                  ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(14),
-                                    ),
-                                    child: Image.network(
-                                      v.thumbUrl!,
-                                      height: 180,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          const SizedBox.shrink(),
-                                    ),
-                                  ),
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      16, 12, 16, 10),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        v.title,
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        v.restaurantName,
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      if (v.description.trim().isNotEmpty)
-                                        Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 6),
-                                          child: Text(
-                                            v.description,
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      const SizedBox(height: 10),
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: ElevatedButton.icon(
-                                          onPressed: () async {
-                                            final uri = Uri.parse(v.videoUrl);
-                                            if (await canLaunchUrl(uri)) {
-                                              await launchUrl(uri,
-                                                  mode: LaunchMode
-                                                      .externalApplication);
-                                            }
-                                          },
-                                          icon: const Icon(Icons.play_arrow),
-                                          label: const Text('Bekijken'),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
