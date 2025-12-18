@@ -5081,6 +5081,12 @@ class _VideoItem {
   });
 }
 
+class _VideoSource {
+  final String id;
+  final String name;
+  const _VideoSource({required this.id, required this.name});
+}
+
 class VideosTab extends StatefulWidget {
   final List<Restaurant> restaurants;
   final bool isActive;
@@ -5147,7 +5153,16 @@ class _VideosTabState extends State<VideosTab> {
       _videos.clear();
     });
     try {
-      for (final r in widget.restaurants) {
+      final sources = <_VideoSource>[];
+      if (widget.restaurants.isNotEmpty) {
+        sources.addAll(
+          widget.restaurants.map((r) => _VideoSource(id: r.id, name: r.name)),
+        );
+      } else {
+        sources.addAll(await _fetchRestaurantsForVideos());
+      }
+
+      for (final r in sources) {
         await _loadVideos(r.id, r.name);
       }
     } catch (e) {
@@ -5220,6 +5235,32 @@ class _VideosTabState extends State<VideosTab> {
       flattened.addAll(list);
     }
     return flattened;
+  }
+
+  Future<List<_VideoSource>> _fetchRestaurantsForVideos() async {
+    try {
+      final res = await apiClient.get(
+        Uri.parse('$apiBase/restaurants'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final list = <_VideoSource>[];
+        if (data is List) {
+          for (final r in data) {
+            if (r is! Map<String, dynamic>) continue;
+            final id = (r['id'] ?? r['vendorId'] ?? '').toString().trim();
+            final name = (r['name'] ?? '').toString().trim();
+            if (id.isEmpty || name.isEmpty) continue;
+            list.add(_VideoSource(id: id, name: name));
+          }
+        }
+        return list;
+      }
+    } catch (_) {
+      // ignore; caller sets error if needed
+    }
+    return const <_VideoSource>[];
   }
 
   Future<void> _disposeVideoController() async {
