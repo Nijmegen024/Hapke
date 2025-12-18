@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import 'app_config.dart';
 
@@ -1197,7 +1198,7 @@ class _RootTabsState extends State<_RootTabs> {
         onLoggedIn: widget.onLoggedIn,
         onLogout: widget.onLogout,
       ),
-      VideosTab(restaurants: widget.restaurants),
+      VideosTab(restaurants: widget.restaurants, isActive: _index == 1),
       CartPage(
         items: widget.cartItems,
         totalCents: widget.cartItems.fold(
@@ -5082,7 +5083,12 @@ class _VideoItem {
 
 class VideosTab extends StatefulWidget {
   final List<Restaurant> restaurants;
-  const VideosTab({super.key, required this.restaurants});
+  final bool isActive;
+  const VideosTab({
+    super.key,
+    required this.restaurants,
+    required this.isActive,
+  });
 
   @override
   State<VideosTab> createState() => _VideosTabState();
@@ -5092,6 +5098,12 @@ class _VideosTabState extends State<VideosTab> {
   final Map<String, List<_VideoItem>> _videos = {};
   bool _loadingAll = false;
   String? _error;
+  final PageController _pageController = PageController();
+  int _activeIndex = 0;
+  bool _muted = true;
+  VideoPlayerController? _videoController;
+  Future<void>? _videoInit;
+  String? _videoInitError;
 
   @override
   void initState() {
@@ -5113,6 +5125,19 @@ class _VideosTabState extends State<VideosTab> {
     if (idsChanged && widget.restaurants.isNotEmpty) {
       _loadAllVideos();
     }
+
+    if (oldWidget.isActive && !widget.isActive) {
+      _videoController?.pause();
+    } else if (!oldWidget.isActive && widget.isActive) {
+      _autoplayActiveVideoIfReady();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _videoController?.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAllVideos() async {
@@ -5132,6 +5157,15 @@ class _VideosTabState extends State<VideosTab> {
         setState(() => _loadingAll = false);
       }
     }
+
+    if (!mounted) return;
+    final list = _allVideos();
+    if (list.isEmpty) {
+      await _disposeVideoController();
+      return;
+    }
+    _activeIndex = 0;
+    await _prepareVideoAtIndex(0, autoplay: widget.isActive);
   }
 
   Future<void> _loadVideos(String restaurantId, String restaurantName) async {
@@ -5188,6 +5222,104 @@ class _VideosTabState extends State<VideosTab> {
     return flattened;
   }
 
+  Future<void> _disposeVideoController() async {
+    final controller = _videoController;
+    _videoController = null;
+    _videoInit = null;
+    _videoInitError = null;
+    if (controller != null) {
+      try {
+        await controller.pause();
+      } catch (_) {}
+      await controller.dispose();
+    }
+  }
+
+  Future<void> _prepareVideoAtIndex(int index, {required bool autoplay}) async {
+    final videos = _allVideos();
+    if (index < 0 || index >= videos.length) return;
+
+    final url = videos[index].videoUrl.trim();
+    final uri = Uri.tryParse(url);
+    await _disposeVideoController();
+
+    if (uri == null) {
+      if (mounted) {
+        setState(() {
+          _videoInitError = 'Ongeldige video-URL';
+        });
+      }
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(uri);
+    _videoController = controller;
+    _videoInitError = null;
+    _videoInit = controller
+        .initialize()
+        .then((_) async {
+          await controller.setLooping(true);
+          await controller.setVolume(_muted ? 0 : 1);
+          if (!mounted) return;
+          if (autoplay) {
+            try {
+              await controller.play();
+            } catch (_) {
+              // Autoplay can be blocked until the user interacts with the page.
+              // Keep the player ready; a tap will start playback.
+            }
+          }
+        })
+        .catchError((e) {
+          if (!mounted) return;
+          setState(() {
+            _videoInitError = 'Video kan niet starten: $e';
+          });
+        });
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _autoplayActiveVideoIfReady() async {
+    final controller = _videoController;
+    if (controller == null) return;
+    if (_videoInitError != null) return;
+    final init = _videoInit;
+    if (init != null) {
+      try {
+        await init;
+      } catch (_) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    if (!controller.value.isInitialized) return;
+    await controller.setVolume(_muted ? 0 : 1);
+    await controller.play();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleMute() async {
+    setState(() => _muted = !_muted);
+    final controller = _videoController;
+    if (controller != null && controller.value.isInitialized) {
+      await controller.setVolume(_muted ? 0 : 1);
+    }
+  }
+
+  Future<void> _togglePlayPause() async {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isPlaying) {
+      await controller.pause();
+    } else {
+      await controller.play();
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final videos = _allVideos();
@@ -5196,6 +5328,13 @@ class _VideosTabState extends State<VideosTab> {
         backgroundColor: const Color(0xFF14B8A6),
         title: const Text("Video's"),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Ververs',
+            onPressed: _loadAllVideos,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: _loadingAll
           ? const Center(child: CircularProgressIndicator())
@@ -5219,89 +5358,182 @@ class _VideosTabState extends State<VideosTab> {
             )
           : videos.isEmpty
           ? const Center(child: Text('Nog geen video\'s beschikbaar'))
-          : RefreshIndicator(
-              onRefresh: _loadAllVideos,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: videos.length,
-                itemBuilder: (context, index) {
-                  final v = videos[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (v.thumbUrl != null)
-                          ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(14),
-                            ),
-                            child: Image.network(
-                              v.thumbUrl!,
-                              height: 180,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
+          : PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              itemCount: videos.length,
+              onPageChanged: (i) async {
+                _activeIndex = i;
+                if (mounted) setState(() {});
+                await _prepareVideoAtIndex(i, autoplay: widget.isActive);
+              },
+              itemBuilder: (context, index) {
+                final v = videos[index];
+                final isActive = index == _activeIndex;
+
+                if (!isActive) {
+                  return Container(
+                    color: Colors.black,
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.play_circle_outline,
+                            color: Colors.white70,
+                            size: 64,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            v.title,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                          const SizedBox(height: 6),
+                          Text(
+                            v.restaurantName,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final controller = _videoController;
+                final init = _videoInit;
+
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(color: Colors.black),
+                    if (_videoInitError != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                v.title,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                _videoInitError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                v.restaurantName,
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              if (v.description.trim().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Text(
-                                    v.description,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              const SizedBox(height: 10),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final uri = Uri.parse(v.videoUrl);
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(
-                                        uri,
-                                        mode: LaunchMode.externalApplication,
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(Icons.play_arrow),
-                                  label: const Text('Bekijken'),
-                                ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final uri = Uri.tryParse(v.videoUrl);
+                                  if (uri != null && await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
+                                  }
+                                },
+                                icon: const Icon(Icons.open_in_new),
+                                label: const Text('Open in browser'),
                               ),
                             ],
                           ),
                         ),
-                      ],
+                      )
+                    else if (controller == null || init == null)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      FutureBuilder<void>(
+                        future: init,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState !=
+                              ConnectionState.done) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (!controller.value.isInitialized) {
+                            return const Center(
+                              child: Text(
+                                'Video kan niet laden',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            );
+                          }
+
+                          return Center(
+                            child: AspectRatio(
+                              aspectRatio: controller.value.aspectRatio == 0
+                                  ? 16 / 9
+                                  : controller.value.aspectRatio,
+                              child: VideoPlayer(controller),
+                            ),
+                          );
+                        },
+                      ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 18,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            v.restaurantName,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            v.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (v.description.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              v.description,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  );
-                },
-              ),
+                    Positioned(
+                      right: 12,
+                      top: 12,
+                      child: IconButton(
+                        tooltip: _muted ? 'Geluid aan' : 'Geluid uit',
+                        onPressed: _toggleMute,
+                        icon: Icon(
+                          _muted ? Icons.volume_off : Icons.volume_up,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _togglePlayPause,
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
     );
   }
