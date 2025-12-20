@@ -5155,18 +5155,43 @@ class _VideosTabState extends State<VideosTab> {
     debugPrint(
       '[VIDEOS] loadAll start, widget restaurants: ${widget.restaurants.length}',
     );
+    final sources = <_VideoSource>[];
+    // Gebruik bestaande lijst
+    sources.addAll(
+      widget.restaurants.map((r) => _VideoSource(id: r.id, name: r.name)),
+    );
+    // Altijd backend raadplegen (deterministisch ophalen)
     try {
-      final sources = <_VideoSource>[];
-      if (widget.restaurants.isNotEmpty) {
-        sources.addAll(
-          widget.restaurants.map((r) => _VideoSource(id: r.id, name: r.name)),
-        );
+      final res = await apiClient.get(
+        Uri.parse('$apiBase/restaurants'),
+        headers: {'Accept': 'application/json'},
+      );
+      debugPrint('[VIDEOS] GET /restaurants status ${res.statusCode}');
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data is List) {
+          for (final r in data) {
+            if (r is! Map<String, dynamic>) continue;
+            final id = (r['id'] ?? r['vendorId'] ?? '').toString().trim();
+            final name = (r['name'] ?? '').toString().trim();
+            if (id.isEmpty || name.isEmpty) continue;
+            sources.add(_VideoSource(id: id, name: name));
+          }
+        }
       } else {
-        sources.addAll(await _fetchRestaurantsForVideos());
+        debugPrint('[VIDEOS] restaurants error: ${res.statusCode} ${res.body}');
       }
-
-      debugPrint('[VIDEOS] sources to fetch: ${sources.length}');
-      for (final r in sources) {
+    } catch (e) {
+      debugPrint('[VIDEOS] restaurants exception: $e');
+    }
+    // Dedup
+    final seen = <String>{};
+    final uniqueSources = sources
+        .where((s) => seen.add(s.id))
+        .toList(growable: false);
+    debugPrint('[VIDEOS] sources to fetch: ${uniqueSources.length}');
+    try {
+      for (final r in uniqueSources) {
         debugPrint('[VIDEOS] fetching videos for ${r.id} ${r.name}');
         await _loadVideos(r.id, r.name);
       }
