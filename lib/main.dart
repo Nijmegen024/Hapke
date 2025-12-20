@@ -60,6 +60,22 @@ class ApiClient {
     });
   }
 
+  Future<http.Response> delete(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+    Encoding? encoding,
+  }) {
+    return _send(() {
+      return _client.delete(
+        uri,
+        headers: _buildHeaders(headers),
+        body: body,
+        encoding: encoding,
+      );
+    });
+  }
+
   Future<http.Response> patch(
     Uri uri, {
     Map<String, String>? headers,
@@ -5322,6 +5338,8 @@ class _VideoItem {
   final double? price;
   final String? menuItemId;
   final String? thumbUrl;
+  final int likesCount;
+  final bool likedByMe;
   _VideoItem({
     required this.id,
     required this.restaurantId,
@@ -5332,6 +5350,21 @@ class _VideoItem {
     this.price,
     this.menuItemId,
     this.thumbUrl,
+    this.likesCount = 0,
+    this.likedByMe = false,
+  });
+}
+
+class _VideoComment {
+  final String id;
+  final String userName;
+  final String text;
+  final DateTime createdAt;
+  _VideoComment({
+    required this.id,
+    required this.userName,
+    required this.text,
+    required this.createdAt,
   });
 }
 
@@ -5490,6 +5523,10 @@ class _VideosTabState extends State<VideosTab> {
             final url = (v['videoUrl'] ?? '').toString().trim();
             if (id.isEmpty || title.isEmpty || url.isEmpty) continue;
             final rawThumb = (v['thumbUrl'] ?? '').toString().trim();
+            final likesCount = v['likesCount'] is num
+                ? (v['likesCount'] as num).round()
+                : 0;
+            final likedByMe = v['likedByMe'] == true;
             list.add(
               _VideoItem(
                 id: id,
@@ -5501,6 +5538,8 @@ class _VideosTabState extends State<VideosTab> {
                 price: null,
                 menuItemId: null,
                 thumbUrl: rawThumb.isEmpty ? null : rawThumb,
+                likesCount: likesCount,
+                likedByMe: likedByMe,
               ),
             );
           }
@@ -5586,6 +5625,10 @@ class _VideosTabState extends State<VideosTab> {
             final menuItemId = (v['menuItemId'] ?? '').toString().trim();
             final priceRaw = v['price'];
             final price = priceRaw is num ? priceRaw.toDouble() : null;
+            final likesCount = v['likesCount'] is num
+                ? (v['likesCount'] as num).round()
+                : 0;
+            final likedByMe = v['likedByMe'] == true;
             list.add(
               _VideoItem(
                 id: id,
@@ -5597,6 +5640,8 @@ class _VideosTabState extends State<VideosTab> {
                 price: price,
                 menuItemId: menuItemId.isEmpty ? null : menuItemId,
                 thumbUrl: rawThumb.isEmpty ? null : rawThumb,
+                likesCount: likesCount,
+                likedByMe: likedByMe,
               ),
             );
           }
@@ -5744,6 +5789,312 @@ class _VideosTabState extends State<VideosTab> {
     await controller.setVolume(_muted ? 0 : 1);
     await controller.play();
     if (mounted) setState(() {});
+  }
+
+  void _updateVideoItem(
+    String id,
+    _VideoItem Function(_VideoItem current) transform,
+  ) {
+    setState(() {
+      _videos.updateAll((key, list) {
+        return list
+            .map((item) => item.id == id ? transform(item) : item)
+            .toList();
+      });
+    });
+  }
+
+  Future<void> _toggleLike(_VideoItem v) async {
+    final targetLiked = !v.likedByMe;
+    final optimisticLikes = targetLiked
+        ? v.likesCount + 1
+        : (v.likesCount - 1).clamp(0, 1000000);
+    _updateVideoItem(
+      v.id,
+      (cur) => _VideoItem(
+        id: cur.id,
+        restaurantId: cur.restaurantId,
+        restaurantName: cur.restaurantName,
+        title: cur.title,
+        description: cur.description,
+        videoUrl: cur.videoUrl,
+        price: cur.price,
+        menuItemId: cur.menuItemId,
+        thumbUrl: cur.thumbUrl,
+        likesCount: optimisticLikes,
+        likedByMe: targetLiked,
+      ),
+    );
+    try {
+      final res = await (targetLiked
+          ? apiClient.post(
+              Uri.parse('$apiBase/videos/${v.id}/like'),
+              headers: {'Accept': 'application/json'},
+            )
+          : apiClient.delete(
+              Uri.parse('$apiBase/videos/${v.id}/like'),
+              headers: {'Accept': 'application/json'},
+            ));
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final body = jsonDecode(res.body);
+        final likesCount = body is Map && body['likesCount'] is num
+            ? body['likesCount']
+            : null;
+        final likedByMe = body is Map && body['likedByMe'] == true;
+        if (likesCount != null) {
+          _updateVideoItem(
+            v.id,
+            (cur) => _VideoItem(
+              id: cur.id,
+              restaurantId: cur.restaurantId,
+              restaurantName: cur.restaurantName,
+              title: cur.title,
+              description: cur.description,
+              videoUrl: cur.videoUrl,
+              price: cur.price,
+              menuItemId: cur.menuItemId,
+              thumbUrl: cur.thumbUrl,
+              likesCount: (likesCount as num).round(),
+              likedByMe: likedByMe,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Status ${res.statusCode}');
+      }
+    } catch (e) {
+      // rollback on failure
+      _updateVideoItem(
+        v.id,
+        (cur) => _VideoItem(
+          id: cur.id,
+          restaurantId: cur.restaurantId,
+          restaurantName: cur.restaurantName,
+          title: cur.title,
+          description: cur.description,
+          videoUrl: cur.videoUrl,
+          price: cur.price,
+          menuItemId: cur.menuItemId,
+          thumbUrl: cur.thumbUrl,
+          likesCount: v.likesCount,
+          likedByMe: v.likedByMe,
+        ),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Like mislukt: $e')));
+      }
+    }
+  }
+
+  Future<List<_VideoComment>> _fetchComments(String videoId) async {
+    final res = await apiClient.get(
+      Uri.parse('$apiBase/videos/$videoId/comments'),
+      headers: {'Accept': 'application/json'},
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Status ${res.statusCode}');
+    }
+    final decoded = jsonDecode(res.body);
+    final list = <_VideoComment>[];
+    if (decoded is List) {
+      for (final c in decoded) {
+        if (c is! Map<String, dynamic>) continue;
+        final id = (c['id'] ?? '').toString();
+        final text = (c['text'] ?? '').toString();
+        final createdAt =
+            DateTime.tryParse((c['createdAt'] ?? '').toString()) ??
+            DateTime.now();
+        String userName = '';
+        if (c['user'] is Map<String, dynamic>) {
+          final user = c['user'] as Map<String, dynamic>;
+          userName = (user['name'] ?? user['email'] ?? '').toString();
+        }
+        if (userName.isEmpty) userName = 'Gebruiker';
+        if (id.isEmpty || text.isEmpty) continue;
+        list.add(
+          _VideoComment(
+            id: id,
+            userName: userName,
+            text: text,
+            createdAt: createdAt,
+          ),
+        );
+      }
+    }
+    return list;
+  }
+
+  Future<_VideoComment?> _postComment(String videoId, String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+    final res = await apiClient.post(
+      Uri.parse('$apiBase/videos/$videoId/comments'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'text': trimmed}),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception('Status ${res.statusCode}: ${res.body}');
+    }
+    final data = jsonDecode(res.body);
+    if (data is Map<String, dynamic>) {
+      final id = (data['id'] ?? '').toString();
+      final createdAt =
+          DateTime.tryParse((data['createdAt'] ?? '').toString()) ??
+          DateTime.now();
+      String userName = '';
+      if (data['user'] is Map<String, dynamic>) {
+        final user = data['user'] as Map<String, dynamic>;
+        userName = (user['name'] ?? user['email'] ?? '').toString();
+      }
+      if (userName.isEmpty) userName = 'Jij';
+      return _VideoComment(
+        id: id,
+        userName: userName,
+        text: trimmed,
+        createdAt: createdAt,
+      );
+    }
+    return null;
+  }
+
+  Future<void> _openCommentsSheet(_VideoItem v) async {
+    List<_VideoComment> comments = const [];
+    String? error;
+    bool loading = true;
+    final inputCtrl = TextEditingController();
+
+    try {
+      comments = await _fetchComments(v.id);
+    } catch (e) {
+      error = 'Comments laden mislukt: $e';
+    } finally {
+      loading = false;
+    }
+
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: MediaQuery.of(ctx).viewInsets,
+          child: StatefulBuilder(
+            builder: (ctx, setModal) {
+              Future<void> submit() async {
+                try {
+                  final newComment = await _postComment(
+                    v.id,
+                    inputCtrl.text.trim(),
+                  );
+                  if (newComment != null) {
+                    setModal(() {
+                      comments = [...comments, newComment];
+                      inputCtrl.clear();
+                    });
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Plaatsen mislukt: $e')),
+                  );
+                }
+              }
+
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Comments',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 1),
+                      if (loading)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(),
+                        )
+                      else if (error != null)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            error!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 280,
+                          child: comments.isEmpty
+                              ? const Center(child: Text('Nog geen comments'))
+                              : ListView.builder(
+                                  itemCount: comments.length,
+                                  itemBuilder: (_, i) {
+                                    final c = comments[i];
+                                    return ListTile(
+                                      dense: true,
+                                      title: Text(c.userName),
+                                      subtitle: Text(c.text),
+                                      trailing: Text(
+                                        '${c.createdAt.hour.toString().padLeft(2, '0')}:${c.createdAt.minute.toString().padLeft(2, '0')}',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: inputCtrl,
+                              decoration: const InputDecoration(
+                                hintText: 'Typ een reactie...',
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: submit,
+                            icon: const Icon(Icons.send),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _shareVideo(_VideoItem v) async {
+    await Clipboard.setData(ClipboardData(text: v.videoUrl));
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Videolink gekopieerd')));
   }
 
   Future<void> _toggleMute() async {
@@ -6130,6 +6481,34 @@ class _VideosTabState extends State<VideosTab> {
                           _muted ? Icons.volume_off : Icons.volume_up,
                           color: Colors.white,
                         ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 12,
+                      bottom: 100,
+                      child: Column(
+                        children: [
+                          _RoundIconButton(
+                            icon: v.likedByMe
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: v.likedByMe ? Colors.pink : Colors.white,
+                            badgeCount: v.likesCount,
+                            onTap: () => _toggleLike(v),
+                          ),
+                          const SizedBox(height: 10),
+                          _RoundIconButton(
+                            icon: Icons.comment,
+                            color: Colors.white,
+                            onTap: () => _openCommentsSheet(v),
+                          ),
+                          const SizedBox(height: 10),
+                          _RoundIconButton(
+                            icon: Icons.share,
+                            color: Colors.white,
+                            onTap: () => _shareVideo(v),
+                          ),
+                        ],
                       ),
                     ),
                     Align(
