@@ -5152,6 +5152,9 @@ class _VideosTabState extends State<VideosTab> {
       _error = null;
       _videos.clear();
     });
+    debugPrint(
+      '[VIDEOS] loadAll start, widget restaurants: ${widget.restaurants.length}',
+    );
     try {
       final sources = <_VideoSource>[];
       if (widget.restaurants.isNotEmpty) {
@@ -5162,10 +5165,13 @@ class _VideosTabState extends State<VideosTab> {
         sources.addAll(await _fetchRestaurantsForVideos());
       }
 
+      debugPrint('[VIDEOS] sources to fetch: ${sources.length}');
       for (final r in sources) {
+        debugPrint('[VIDEOS] fetching videos for ${r.id} ${r.name}');
         await _loadVideos(r.id, r.name);
       }
     } catch (e) {
+      debugPrint('[VIDEOS] loadAll error: $e');
       _error = 'Video’s laden mislukt: $e';
     } finally {
       if (mounted) {
@@ -5188,6 +5194,9 @@ class _VideosTabState extends State<VideosTab> {
       final res = await apiClient.get(
         Uri.parse('$apiBase/restaurants/$restaurantId/videos'),
         headers: {'Accept': 'application/json'},
+      );
+      debugPrint(
+        '[VIDEOS] GET /restaurants/$restaurantId/videos status ${res.statusCode}',
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -5223,6 +5232,7 @@ class _VideosTabState extends State<VideosTab> {
         });
       }
     } catch (e) {
+      debugPrint('[VIDEOS] loadVideos exception for $restaurantId: $e');
       setState(() {
         _error = 'Video’s laden mislukt: $e';
       });
