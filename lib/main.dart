@@ -5861,12 +5861,17 @@ class _VideosTabState extends State<VideosTab> {
                         ),
                       ),
                     ),
-                    Positioned.fill(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _togglePlayPause,
-                          child: const SizedBox.expand(),
+                    Align(
+                      alignment: Alignment.center,
+                      child: FractionallySizedBox(
+                        widthFactor: 0.6,
+                        heightFactor: 0.6,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _togglePlayPause,
+                            child: const SizedBox.expand(),
+                          ),
                         ),
                       ),
                     ),
