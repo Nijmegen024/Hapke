@@ -5289,7 +5289,15 @@ class _VideosTabState extends State<VideosTab> {
         headers: {'Accept': 'application/json'},
       );
       debugPrint('[VIDEOS] GET /videos status ${res.statusCode}');
-      if (res.statusCode == 200) {
+      if (res.statusCode == 404) {
+        debugPrint('[VIDEOS] /videos not found -> fallback per restaurant');
+        // Stop loading state here; _loadAllVideos will manage its own.
+        if (mounted) {
+          setState(() => _loadingAll = false);
+        }
+        await _loadAllVideos();
+        return;
+      } else if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         final list = <_VideoItem>[];
         if (data is List) {
