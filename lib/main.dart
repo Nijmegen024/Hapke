@@ -2723,6 +2723,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _categoryKeys = {};
   String? _selectedCategory;
+  final Map<String, String> _categoryNames = {};
 
   @override
   void initState() {
@@ -2732,6 +2733,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
     if (_menu.isEmpty) {
       _fetchMenu();
     }
+    _fetchCategories();
   }
 
   @override
@@ -2745,6 +2747,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
       } else {
         setState(() {});
       }
+      _fetchCategories();
     }
   }
 
@@ -2826,6 +2829,15 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         .map((m) => m.categoryId ?? 'uncategorized')
         .toSet()
         .toList();
+    for (final m in _menu) {
+      final catId = m.categoryId;
+      if (catId != null &&
+          catId.isNotEmpty &&
+          m.categoryName != null &&
+          m.categoryName!.isNotEmpty) {
+        _categoryNames[catId] = m.categoryName!;
+      }
+    }
     for (final c in cats) {
       _categoryKeys[c] = GlobalKey();
     }
@@ -3153,6 +3165,9 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
 
   String _labelForCategory(String id, int index) {
     if (id == 'uncategorized') return 'Alles';
+    if (_categoryNames[id] != null && _categoryNames[id]!.isNotEmpty) {
+      return _categoryNames[id]!;
+    }
     if (_menu.isNotEmpty) {
       final item = _menu.firstWhere(
         (m) => (m.categoryId ?? 'uncategorized') == id,
@@ -3175,6 +3190,47 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         ctx,
         duration: const Duration(milliseconds: 300),
       );
+    }
+  }
+
+  Future<void> _fetchCategories() async {
+    final restaurantId = widget.restaurant.id;
+    final endpoints = [
+      '$apiBase/restaurants/$restaurantId/menu-categories',
+      '$apiBase/restaurants/$restaurantId/categories',
+      '$apiBase/menu-categories?restaurantId=$restaurantId',
+      '$apiBase/categories?restaurantId=$restaurantId',
+    ];
+    for (final url in endpoints) {
+      try {
+        final res = await apiClient.get(Uri.parse(url));
+        if (res.statusCode != 200) continue;
+        final data = jsonDecode(res.body);
+        if (data is List) {
+          final map = <String, String>{};
+          for (final entry in data) {
+            if (entry is! Map<String, dynamic>) continue;
+            final id = (entry['id'] ?? entry['categoryId'] ?? '')
+                .toString()
+                .trim();
+            final name = (entry['name'] ?? entry['title'] ?? '')
+                .toString()
+                .trim();
+            if (id.isEmpty || name.isEmpty) continue;
+            map[id] = name;
+          }
+          if (map.isNotEmpty && mounted) {
+            setState(() {
+              _categoryNames
+                ..clear()
+                ..addAll(map);
+            });
+            return;
+          }
+        }
+      } catch (_) {
+        // ignore and try next endpoint
+      }
     }
   }
 }
