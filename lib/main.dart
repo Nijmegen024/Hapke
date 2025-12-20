@@ -5066,17 +5066,23 @@ class _SearchPill extends StatelessWidget {
 
 class _VideoItem {
   final String id;
+  final String restaurantId;
   final String restaurantName;
   final String title;
   final String description;
   final String videoUrl;
+  final double? price;
+  final String? menuItemId;
   final String? thumbUrl;
   _VideoItem({
     required this.id,
+    required this.restaurantId,
     required this.restaurantName,
     required this.title,
     required this.description,
     required this.videoUrl,
+    this.price,
+    this.menuItemId,
     this.thumbUrl,
   });
 }
@@ -5110,11 +5116,13 @@ class _VideosTabState extends State<VideosTab> {
   VideoPlayerController? _videoController;
   Future<void>? _videoInit;
   String? _videoInitError;
+  bool _ordering = false;
+  String? _orderSuccess;
 
   @override
   void initState() {
     super.initState();
-    _loadAllVideos();
+    _loadFeed();
   }
 
   @override
@@ -5129,7 +5137,7 @@ class _VideosTabState extends State<VideosTab> {
     // are loaded async in the parent, so we reload videos when the restaurant
     // list arrives/changes.
     if (idsChanged && widget.restaurants.isNotEmpty) {
-      _loadAllVideos();
+      _loadFeed();
     }
 
     if (oldWidget.isActive && !widget.isActive) {
@@ -5237,10 +5245,13 @@ class _VideosTabState extends State<VideosTab> {
             list.add(
               _VideoItem(
                 id: id,
+                restaurantId: restaurantId,
                 restaurantName: restaurantName,
                 title: title,
                 description: (v['description'] ?? '').toString(),
                 videoUrl: url,
+                price: null,
+                menuItemId: null,
                 thumbUrl: rawThumb.isEmpty ? null : rawThumb,
               ),
             );
@@ -5262,6 +5273,85 @@ class _VideosTabState extends State<VideosTab> {
         _error = 'Video’s laden mislukt: $e';
       });
     }
+  }
+
+  // New feed-based loader: fetch all videos from /videos
+  Future<void> _loadFeed() async {
+    setState(() {
+      _loadingAll = true;
+      _error = null;
+      _videos.clear();
+    });
+    debugPrint('[VIDEOS] load feed start');
+    try {
+      final res = await apiClient.get(
+        Uri.parse('$apiBase/videos'),
+        headers: {'Accept': 'application/json'},
+      );
+      debugPrint('[VIDEOS] GET /videos status ${res.statusCode}');
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final list = <_VideoItem>[];
+        if (data is List) {
+          for (final v in data) {
+            if (v is! Map<String, dynamic>) continue;
+            final id = (v['id'] ?? '').toString().trim();
+            final title = (v['title'] ?? '').toString().trim();
+            final url = (v['videoUrl'] ?? '').toString().trim();
+            final restId = (v['restaurantId'] ?? '').toString().trim();
+            final restName = (v['restaurantName'] ?? '').toString().trim();
+            if (id.isEmpty || title.isEmpty || url.isEmpty || restId.isEmpty) {
+              continue;
+            }
+            final rawThumb = (v['thumbUrl'] ?? '').toString().trim();
+            final menuItemId = (v['menuItemId'] ?? '').toString().trim();
+            final priceRaw = v['price'];
+            final price = priceRaw is num ? priceRaw.toDouble() : null;
+            list.add(
+              _VideoItem(
+                id: id,
+                restaurantId: restId,
+                restaurantName: restName.isEmpty ? 'Restaurant' : restName,
+                title: title,
+                description: (v['description'] ?? '').toString(),
+                videoUrl: url,
+                price: price,
+                menuItemId: menuItemId.isEmpty ? null : menuItemId,
+                thumbUrl: rawThumb.isEmpty ? null : rawThumb,
+              ),
+            );
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _videos['feed'] = list;
+          });
+        }
+      } else {
+        debugPrint('[VIDEOS] feed error: ${res.statusCode} ${res.body}');
+        setState(() {
+          _error = 'Video’s laden mislukt (${res.statusCode})';
+        });
+      }
+    } catch (e) {
+      debugPrint('[VIDEOS] feed exception: $e');
+      setState(() {
+        _error = 'Video’s laden mislukt: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAll = false);
+      }
+    }
+
+    if (!mounted) return;
+    final list = _allVideos();
+    if (list.isEmpty) {
+      await _disposeVideoController();
+      return;
+    }
+    _activeIndex = 0;
+    await _prepareVideoAtIndex(0, autoplay: widget.isActive);
   }
 
   List<_VideoItem> _allVideos() {
@@ -5396,6 +5486,151 @@ class _VideosTabState extends State<VideosTab> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _showOrderSheet(_VideoItem v) async {
+    final qty = ValueNotifier<int>(1);
+    final notesCtrl = TextEditingController();
+    _orderSuccess = null;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: MediaQuery.of(ctx).viewInsets,
+          child: ValueListenableBuilder<int>(
+            valueListenable: qty,
+            builder: (_, value, __) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      v.title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      v.restaurantName,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    if (v.price != null) ...[
+                      const SizedBox(height: 6),
+                      Text('Prijs: €${(v.price ?? 0).toStringAsFixed(2)}'),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text('Aantal'),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: value > 1
+                              ? () => qty.value = value - 1
+                              : null,
+                          icon: const Icon(Icons.remove_circle_outline),
+                        ),
+                        Text('$value'),
+                        IconButton(
+                          onPressed: () => qty.value = value + 1,
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
+                      ],
+                    ),
+                    TextField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Opmerkingen (optioneel)',
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _ordering
+                            ? null
+                            : () async {
+                                await _placeOrderFromVideo(
+                                  videoId: v.id,
+                                  quantity: qty.value,
+                                  notes: notesCtrl.text.trim(),
+                                );
+                                if (mounted && _orderSuccess != null) {
+                                  Navigator.of(ctx).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(_orderSuccess!)),
+                                  );
+                                }
+                              },
+                        icon: _ordering
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.shopping_bag_outlined),
+                        label: const Text('Plaats bestelling'),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _placeOrderFromVideo({
+    required String videoId,
+    required int quantity,
+    required String notes,
+  }) async {
+    setState(() {
+      _ordering = true;
+      _orderSuccess = null;
+    });
+    try {
+      final res = await apiClient.post(
+        Uri.parse('$apiBase/orders/from-video'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'videoId': videoId,
+          'quantity': quantity,
+          'notes': notes,
+        }),
+      );
+      debugPrint(
+        '[VIDEOS] POST /orders/from-video status ${res.statusCode} body ${res.body}',
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        _orderSuccess = 'Bestelling geplaatst';
+      } else {
+        _orderSuccess = 'Bestellen mislukt (${res.statusCode})';
+      }
+    } catch (e) {
+      debugPrint('[VIDEOS] order exception: $e');
+      _orderSuccess = 'Bestellen mislukt: $e';
+    } finally {
+      if (mounted) {
+        setState(() {
+          _ordering = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final videos = _allVideos();
@@ -5407,7 +5642,7 @@ class _VideosTabState extends State<VideosTab> {
         actions: [
           IconButton(
             tooltip: 'Ververs',
-            onPressed: _loadAllVideos,
+            onPressed: _loadFeed,
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -5424,7 +5659,7 @@ class _VideosTabState extends State<VideosTab> {
                     Text(_error!, textAlign: TextAlign.center),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
-                      onPressed: _loadAllVideos,
+                      onPressed: _loadFeed,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Opnieuw proberen'),
                     ),
@@ -5574,6 +5809,17 @@ class _VideosTabState extends State<VideosTab> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                          if (v.price != null) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              '€${(v.price ?? 0).toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                           if (v.description.trim().isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Text(
@@ -5583,6 +5829,15 @@ class _VideosTabState extends State<VideosTab> {
                               style: const TextStyle(color: Colors.white70),
                             ),
                           ],
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showOrderSheet(v),
+                              icon: const Icon(Icons.shopping_bag_outlined),
+                              label: const Text('Bestel'),
+                            ),
+                          ),
                         ],
                       ),
                     ),
