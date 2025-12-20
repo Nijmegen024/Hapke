@@ -147,12 +147,16 @@ class MenuItem {
   final String description;
   final int priceCents;
   final String? imageUrl;
+  final String? categoryId;
+  final String? categoryName;
   const MenuItem({
     required this.id,
     required this.name,
     required this.description,
     required this.priceCents,
     this.imageUrl,
+    this.categoryId,
+    this.categoryName,
   });
 }
 
@@ -170,6 +174,10 @@ List<MenuItem> _parseMenuItemsFromApi(dynamic rawMenu) {
     final priceCents = _readPriceCents(entry);
     final rawImage = (entry['imageUrl'] ?? '').toString().trim();
     final imageUrl = rawImage.isEmpty ? null : rawImage;
+    final rawCategoryId = (entry['categoryId'] ?? '').toString().trim();
+    final rawCategoryName = (entry['categoryName'] ?? entry['category'] ?? '')
+        .toString()
+        .trim();
     parsed.add(
       MenuItem(
         id: id,
@@ -177,6 +185,10 @@ List<MenuItem> _parseMenuItemsFromApi(dynamic rawMenu) {
         description: description,
         priceCents: priceCents,
         imageUrl: imageUrl,
+        categoryId: rawCategoryId.isNotEmpty
+            ? rawCategoryId
+            : (rawCategoryName.isNotEmpty ? rawCategoryName : null),
+        categoryName: rawCategoryName.isNotEmpty ? rawCategoryName : null,
       ),
     );
   }
@@ -2708,11 +2720,15 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
   List<MenuItem> _menu = const [];
   bool _loadingMenu = false;
   String? _menuError;
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _categoryKeys = {};
+  String? _selectedCategory;
 
   @override
   void initState() {
     super.initState();
     _menu = List<MenuItem>.from(widget.restaurant.menu);
+    _rebuildCategoryKeys();
     if (_menu.isEmpty) {
       _fetchMenu();
     }
@@ -2723,6 +2739,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.restaurant.id != widget.restaurant.id) {
       _menu = List<MenuItem>.from(widget.restaurant.menu);
+      _rebuildCategoryKeys();
       if (_menu.isEmpty) {
         _fetchMenu();
       } else {
@@ -2734,6 +2751,12 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
   Future<void> _openCart() async {
     await widget.openCartModal(context);
     if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _handleAdd(MenuItem m) {
@@ -2772,6 +2795,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         if (mounted) {
           setState(() {
             _menu = parsed;
+            _rebuildCategoryKeys();
           });
         }
       } else {
@@ -2796,6 +2820,20 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
     }
   }
 
+  void _rebuildCategoryKeys() {
+    _categoryKeys.clear();
+    final cats = _menu
+        .map((m) => m.categoryId ?? 'uncategorized')
+        .toSet()
+        .toList();
+    for (final c in cats) {
+      _categoryKeys[c] = GlobalKey();
+    }
+    if (cats.isNotEmpty) {
+      _selectedCategory = cats.first;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartCount = widget.cartItems.fold(0, (n, ci) => n + ci.qty);
@@ -2816,6 +2854,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
     ];
     final visibleItems = previewItems.take(4).toList();
     final remainingItems = previewItems.length - visibleItems.length;
+    final categoryOrder = _buildCategoryOrder();
 
     return Scaffold(
       appBar: AppBar(
@@ -2856,192 +2895,345 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
               itemCount: cartCount,
               onTap: () async => _openCart(),
             ),
-      body: ListView.separated(
-        padding: EdgeInsets.fromLTRB(12, 12, 12, bottomPadding),
-        itemCount: _menu.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (_, i) {
-          if (i == 0) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Hero(
-                      tag: 'rest_${widget.restaurant.id}',
-                      child: Image.network(
-                        widget.restaurant.imageUrl,
-                        fit: BoxFit.cover,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(12, 12, 12, bottomPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Hero(
+                        tag: 'rest_${widget.restaurant.id}',
+                        child: Image.network(
+                          widget.restaurant.imageUrl,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.shopping_basket_outlined, size: 18),
-                    const SizedBox(width: 6),
-                    Text('Min. ' + _formatEuros(widget.restaurant.minOrder)),
-                    const SizedBox(width: 16),
-                    const Icon(Icons.pedal_bike, size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      widget.restaurant.deliveryFee == null
-                          ? 'Gratis bezorging'
-                          : '${_formatEuros(widget.restaurant.deliveryFee!)} bezorging',
-                    ),
-                  ],
-                ),
-                if (previewItems.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Je MANDDD!!',
-                                style: TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                              Text(
-                                _formatPrice(totalCents),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.shopping_basket_outlined, size: 18),
+                      const SizedBox(width: 6),
+                      Text('Min. ' + _formatEuros(widget.restaurant.minOrder)),
+                      const SizedBox(width: 16),
+                      const Icon(Icons.pedal_bike, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        widget.restaurant.deliveryFee == null
+                            ? 'Gratis bezorging'
+                            : '${_formatEuros(widget.restaurant.deliveryFee!)} bezorging',
+                      ),
+                    ],
+                  ),
+                  if (previewItems.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Je MANDDD!!',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ...visibleItems.map(
-                            (ci) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${ci.qty}× ${ci.item.name}' +
-                                          (ci.restaurant.id ==
+                                Text(
+                                  _formatPrice(totalCents),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ...visibleItems.map(
+                              (ci) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${ci.qty}× ${ci.item.name}' +
+                                            (ci.restaurant.id ==
+                                                    widget.restaurant.id
+                                                ? ''
+                                                : ' • ${ci.restaurant.name}'),
+                                        style: TextStyle(
+                                          color:
+                                              ci.restaurant.id ==
                                                   widget.restaurant.id
-                                              ? ''
-                                              : ' • ${ci.restaurant.name}'),
-                                      style: TextStyle(
-                                        color:
-                                            ci.restaurant.id ==
-                                                widget.restaurant.id
-                                            ? Colors.black
-                                            : Colors.black54,
+                                              ? Colors.black
+                                              : Colors.black54,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _formatPrice(ci.item.priceCents * ci.qty),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _formatPrice(ci.item.priceCents * ci.qty),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (remainingItems > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                '+ $remainingItems extra ${remainingItems == 1 ? 'item' : 'items'}',
-                                style: const TextStyle(
-                                  color: Colors.black54,
-                                  fontSize: 12,
+                                  ],
                                 ),
                               ),
                             ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: () => _openCart(),
-                              icon: const Icon(Icons.shopping_bag_outlined),
-                              label: const Text('Bekijk MANDDD!!'),
+                            if (remainingItems > 0)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  '+ $remainingItems extra ${remainingItems == 1 ? 'item' : 'items'}',
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: () => _openCart(),
+                                icon: const Icon(Icons.shopping_bag_outlined),
+                                label: const Text('Bekijk MANDDD!!'),
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_menuError != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4F4),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _menuError!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _loadingMenu ? null : _fetchMenu,
+                            child: const Text('Opnieuw'),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                  ] else if (_menu.isEmpty && !_loadingMenu) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Het menu van dit restaurant wordt binnenkort aangevuld. Houd Hapke in de gaten!',
+                        style: TextStyle(color: Colors.black87),
+                      ),
+                    ),
+                  ] else if (_loadingMenu && _menu.isEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Center(child: CircularProgressIndicator()),
+                  ],
                 ],
-                if (_menuError != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF4F4),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _menuError!,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _loadingMenu ? null : _fetchMenu,
-                          child: const Text('Opnieuw'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (_menu.isEmpty && !_loadingMenu) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Het menu van dit restaurant wordt binnenkort aangevuld. Houd Hapke in de gaten!',
-                      style: TextStyle(color: Colors.black87),
-                    ),
-                  ),
-                ] else if (_loadingMenu && _menu.isEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Center(child: CircularProgressIndicator()),
-                ],
-              ],
-            );
-          }
-          final menuItems = _menu;
-          if (_loadingMenu && menuItems.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.only(top: 24),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          final m = menuItems[i - 1];
-          return MenuItemCard(
-            name: m.name,
-            description: m.description,
-            price: m.priceCents / 100,
-            imageUrl: m.imageUrl,
-            onAdd: () => _handleAdd(m),
-          );
-        },
+              ),
+            ),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _CategoryHeader(
+              categories: categoryOrder,
+              selected: _selectedCategory,
+              onTap: _scrollToCategory,
+              labelBuilder: (id) =>
+                  _labelForCategory(id, categoryOrder.indexOf(id)),
+            ),
+          ),
+          if (_loadingMenu && _menu.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            )
+          else
+            ..._buildCategorySections(categoryOrder),
+          SliverToBoxAdapter(child: SizedBox(height: bottomPadding)),
+        ],
       ),
     );
+  }
+
+  List<String> _buildCategoryOrder() {
+    final seen = <String>{};
+    final order = <String>[];
+    for (final m in _menu) {
+      final cat = m.categoryId ?? 'uncategorized';
+      if (seen.add(cat)) {
+        order.add(cat);
+      }
+    }
+    if (order.isEmpty) {
+      order.add('uncategorized');
+    }
+    if (_selectedCategory == null && order.isNotEmpty) {
+      _selectedCategory = order.first;
+    }
+    return order;
+  }
+
+  List<Widget> _buildCategorySections(List<String> order) {
+    final sections = <Widget>[];
+    for (final catId in order) {
+      final items = _menu
+          .where((m) => (m.categoryId ?? 'uncategorized') == catId)
+          .toList();
+      if (items.isEmpty) continue;
+      final key = _categoryKeys[catId] ?? GlobalKey();
+      _categoryKeys[catId] = key;
+      sections.add(
+        SliverToBoxAdapter(
+          child: Container(
+            key: key,
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+            child: Text(
+              _labelForCategory(catId, order.indexOf(catId)),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      );
+      sections.add(
+        SliverList(
+          delegate: SliverChildBuilderDelegate((_, idx) {
+            final m = items[idx];
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: MenuItemCard(
+                name: m.name,
+                description: m.description,
+                price: m.priceCents / 100,
+                imageUrl: m.imageUrl,
+                onAdd: () => _handleAdd(m),
+              ),
+            );
+          }, childCount: items.length),
+        ),
+      );
+    }
+    return sections;
+  }
+
+  String _labelForCategory(String id, int index) {
+    if (id == 'uncategorized') return 'Alles';
+    if (_menu.isNotEmpty) {
+      final item = _menu.firstWhere(
+        (m) => (m.categoryId ?? 'uncategorized') == id,
+        orElse: () => _menu.first,
+      );
+      if (item.categoryName != null && item.categoryName!.isNotEmpty) {
+        return item.categoryName!;
+      }
+    }
+    return 'Categorie ${index + 1}';
+  }
+
+  Future<void> _scrollToCategory(String catId) async {
+    final key = _categoryKeys[catId];
+    if (key == null) return;
+    setState(() => _selectedCategory = catId);
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+      );
+    }
+  }
+}
+
+class _CategoryHeader extends SliverPersistentHeaderDelegate {
+  final List<String> categories;
+  final String? selected;
+  final ValueChanged<String> onTap;
+  final String Function(String id)? labelBuilder;
+
+  _CategoryHeader({
+    required this.categories,
+    required this.selected,
+    required this.onTap,
+    this.labelBuilder,
+  });
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    if (categories.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: categories.map((cat) {
+            final isSelected = cat == selected;
+            final label = labelBuilder?.call(cat) ?? cat;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                selected: isSelected,
+                label: Text(label),
+                onSelected: (_) => onTap(cat),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 56;
+
+  @override
+  double get minExtent => 56;
+
+  @override
+  bool shouldRebuild(covariant _CategoryHeader oldDelegate) {
+    return !setEquals(categories.toSet(), oldDelegate.categories.toSet()) ||
+        selected != oldDelegate.selected;
   }
 }
 
