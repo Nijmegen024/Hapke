@@ -5554,10 +5554,33 @@ class _VideosTabState extends State<VideosTab> {
             final id = (v['id'] ?? '').toString().trim();
             final title = (v['title'] ?? '').toString().trim();
             final url = (v['videoUrl'] ?? '').toString().trim();
-            final restId = (v['restaurantId'] ?? '').toString().trim();
-            final restName = (v['restaurantName'] ?? '').toString().trim();
+            final restId =
+                (v['restaurantId'] ?? v['vendorId'] ?? v['restaurant'] ?? '')
+                    .toString()
+                    .trim();
+            String restName = (v['restaurantName'] ?? v['vendorName'] ?? '')
+                .toString()
+                .trim();
             if (id.isEmpty || title.isEmpty || url.isEmpty || restId.isEmpty) {
               continue;
+            }
+            if (restName.isEmpty) {
+              final found = widget.restaurants.firstWhere(
+                (r) => r.id == restId,
+                orElse: () => const Restaurant(
+                  // dummy fallback
+                  id: '',
+                  name: '',
+                  cuisine: '',
+                  category: '',
+                  rating: 0,
+                  eta: '',
+                  menu: [],
+                  imageUrl: '',
+                  minOrder: 0,
+                ),
+              );
+              restName = found.name.isNotEmpty ? found.name : 'Restaurant';
             }
             final rawThumb = (v['thumbUrl'] ?? '').toString().trim();
             final menuItemId = (v['menuItemId'] ?? '').toString().trim();
