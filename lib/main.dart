@@ -1198,6 +1198,26 @@ class _RootTabsState extends State<_RootTabs> {
     );
   }
 
+  Future<void> _openRestaurantFromVideo(Restaurant r) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RestaurantDetailPage(
+          restaurant: r,
+          onAdd: (item) => widget.onAdd(r, item),
+          openCartModal: _openCartModal,
+          cartItems: widget.cartItems,
+        ),
+      ),
+    );
+  }
+
+  void _addFromVideo(Restaurant r, MenuItem item) {
+    widget.onAdd(r, item);
+    setState(() {
+      _index = 2; // switch to cart tab
+    });
+  }
+
   Future<void> _openLogin() async {
     final result = await Navigator.of(
       context,
@@ -1226,7 +1246,12 @@ class _RootTabsState extends State<_RootTabs> {
         onLoggedIn: widget.onLoggedIn,
         onLogout: widget.onLogout,
       ),
-      VideosTab(restaurants: widget.restaurants, isActive: _index == 1),
+      VideosTab(
+        restaurants: widget.restaurants,
+        isActive: _index == 1,
+        onOpenRestaurant: _openRestaurantFromVideo,
+        onAddMenuItem: _addFromVideo,
+      ),
       CartPage(
         items: widget.cartItems,
         totalCents: widget.cartItems.fold(
@@ -5383,10 +5408,14 @@ class _VideoSource {
 class VideosTab extends StatefulWidget {
   final List<Restaurant> restaurants;
   final bool isActive;
+  final void Function(Restaurant restaurant)? onOpenRestaurant;
+  final void Function(Restaurant restaurant, MenuItem item)? onAddMenuItem;
   const VideosTab({
     super.key,
     required this.restaurants,
     required this.isActive,
+    this.onOpenRestaurant,
+    this.onAddMenuItem,
   });
 
   @override
@@ -6731,13 +6760,23 @@ class _VideosTabState extends State<VideosTab> {
                                     ),
                                   ),
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Restaurant openen komt binnenkort',
-                                        ),
-                                      ),
+                                    final rest = _findRestaurant(
+                                      v.restaurantId,
                                     );
+                                    if (rest != null &&
+                                        widget.onOpenRestaurant != null) {
+                                      widget.onOpenRestaurant!(rest);
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Restaurant niet gevonden',
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   },
                                   icon: const Icon(Icons.store_mall_directory),
                                   label: const Text('Restaurant'),
@@ -6757,10 +6796,34 @@ class _VideosTabState extends State<VideosTab> {
                                     ),
                                   ),
                                   onPressed: () {
+                                    final rest = _findRestaurant(
+                                      v.restaurantId,
+                                    );
+                                    if (rest != null &&
+                                        widget.onAddMenuItem != null) {
+                                      if (v.menuItemId != null &&
+                                          v.menuItemId!.isNotEmpty) {
+                                        final item = rest.menu.firstWhere(
+                                          (m) => m.id == v.menuItemId,
+                                          orElse: () => rest.menu.isNotEmpty
+                                              ? rest.menu.first
+                                              : MenuItem(
+                                                  id: '',
+                                                  name: '',
+                                                  description: '',
+                                                  priceCents: 0,
+                                                ),
+                                        );
+                                        if (item.id.isNotEmpty) {
+                                          widget.onAddMenuItem!(rest, item);
+                                          return;
+                                        }
+                                      }
+                                    }
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Toevoegen komt binnenkort',
+                                          'Gerecht niet gevonden bij dit restaurant',
                                         ),
                                       ),
                                     );
