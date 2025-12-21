@@ -6127,6 +6127,9 @@ class _VideosTabState extends State<VideosTab> {
       },
       body: jsonEncode({'toUserId': toUserId, 'videoId': videoId}),
     );
+    if (res.statusCode == 404) {
+      throw Exception('Server ondersteunt delen nog niet (404)');
+    }
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception('Status ${res.statusCode}');
     }
@@ -6673,7 +6676,7 @@ class _VideosTabState extends State<VideosTab> {
                           ),
                           const SizedBox(height: 10),
                           _RoundIconButton(
-                            icon: Icons.share,
+                            icon: Icons.send_rounded,
                             color: Colors.white,
                             onTap: () => _shareVideo(v),
                           ),
