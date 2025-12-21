@@ -5368,6 +5368,12 @@ class _VideoComment {
   });
 }
 
+class _ShareFriend {
+  final String id;
+  final String name;
+  const _ShareFriend({required this.id, required this.name});
+}
+
 class _VideoSource {
   final String id;
   final String name;
@@ -6089,12 +6095,175 @@ class _VideosTabState extends State<VideosTab> {
     );
   }
 
-  Future<void> _shareVideo(_VideoItem v) async {
-    await Clipboard.setData(ClipboardData(text: v.videoUrl));
+  Future<List<_ShareFriend>> _fetchShareFriends() async {
+    try {
+      final res = await apiClient.get(
+        Uri.parse('$apiBase/friends'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode != 200) return const [];
+      final decoded = jsonDecode(res.body);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map<String, dynamic>>()
+            .map(FriendSummary.fromJson)
+            .where((f) => f.user.id.isNotEmpty)
+            .map((f) => _ShareFriend(id: f.user.id, name: f.user.displayName))
+            .toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  Future<void> _sendVideoToFriend({
+    required String videoId,
+    required String toUserId,
+  }) async {
+    final res = await apiClient.post(
+      Uri.parse('$apiBase/video-shares'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'toUserId': toUserId, 'videoId': videoId}),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception('Status ${res.statusCode}');
+    }
+  }
+
+  Future<void> _openShareSheet(_VideoItem v) async {
+    List<_ShareFriend> friends = const [];
+    bool loading = true;
+    String? error;
+
+    try {
+      friends = await _fetchShareFriends();
+    } catch (e) {
+      error = 'Vrienden laden mislukt: $e';
+    } finally {
+      loading = false;
+    }
+
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Videolink gekopieerd')));
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: StatefulBuilder(
+            builder: (ctx, setModal) {
+              Future<void> copyLink() async {
+                await Clipboard.setData(ClipboardData(text: v.videoUrl));
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Link gekopieerd')),
+                );
+              }
+
+              Future<void> sendTo(String userId, String name) async {
+                setModal(() {
+                  loading = true;
+                  error = null;
+                });
+                try {
+                  await _sendVideoToFriend(videoId: v.id, toUserId: userId);
+                  if (!mounted) return;
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Verstuurd naar $name')),
+                  );
+                } catch (e) {
+                  setModal(() {
+                    loading = false;
+                    error = 'Versturen mislukt: $e';
+                  });
+                }
+              }
+
+              return SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Deel video',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: copyLink,
+                      icon: const Icon(Icons.link),
+                      label: const Text('Kopieer link'),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Stuur naar vriend',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (loading)
+                      const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (error != null)
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      )
+                    else if (friends.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text('Geen vrienden gevonden of niet ingelogd'),
+                      )
+                    else
+                      SizedBox(
+                        height: 240,
+                        child: ListView.builder(
+                          itemCount: friends.length,
+                          itemBuilder: (_, i) {
+                            final f = friends[i];
+                            return ListTile(
+                              leading: const CircleAvatar(
+                                child: Icon(Icons.person),
+                              ),
+                              title: Text(f.name),
+                              onTap: () => sendTo(f.id, f.name),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _shareVideo(_VideoItem v) async {
+    await _openShareSheet(v);
   }
 
   Future<void> _toggleMute() async {
