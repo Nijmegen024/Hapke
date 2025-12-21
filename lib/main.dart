@@ -5406,6 +5406,58 @@ class _VideosTabState extends State<VideosTab> {
   bool _ordering = false;
   String? _orderSuccess;
 
+  Restaurant? _findRestaurant(String id) {
+    try {
+      return widget.restaurants.firstWhere((r) => r.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<Widget> _buildTopInfo(Restaurant r) {
+    return [
+      Text(
+        r.name,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        '${r.cuisine} • ${r.category}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white70, fontSize: 14),
+      ),
+      const SizedBox(height: 6),
+      Row(
+        children: [
+          const Icon(Icons.star, color: Colors.amber),
+          const SizedBox(width: 4),
+          Text(
+            r.rating.toStringAsFixed(1),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Icon(Icons.timer_outlined, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            r.eta,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -6578,39 +6630,81 @@ class _VideosTabState extends State<VideosTab> {
                             );
                           }
 
-                          return Center(
-                            child: AspectRatio(
-                              aspectRatio: controller.value.aspectRatio == 0
-                                  ? 16 / 9
-                                  : controller.value.aspectRatio,
-                              child: VideoPlayer(controller),
-                            ),
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Center(
+                                child: AspectRatio(
+                                  aspectRatio: controller.value.aspectRatio == 0
+                                      ? 16 / 9
+                                      : controller.value.aspectRatio,
+                                  child: VideoPlayer(controller),
+                                ),
+                              ),
+                              Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Color(0xAA000000),
+                                      Colors.transparent,
+                                      Color(0xAA000000),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
+                    // Top-left info
+                    Positioned(
+                      left: 16,
+                      right: 160,
+                      top: 20,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_findRestaurant(v.restaurantId) != null)
+                            ..._buildTopInfo(_findRestaurant(v.restaurantId)!)
+                          else
+                            Text(
+                              v.restaurantName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Bottom-left info and actions
                     Positioned(
                       left: 16,
                       right: 16,
-                      bottom: 18,
+                      bottom: 22,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            v.restaurantName,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
                             v.title,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 20,
+                              fontSize: 24,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                          if (v.description.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              v.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
                           if (v.price != null) ...[
                             const SizedBox(height: 6),
                             Text(
@@ -6618,27 +6712,64 @@ class _VideosTabState extends State<VideosTab> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
-                          if (v.description.trim().isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              v.description,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          ],
-                          const SizedBox(height: 10),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showOrderSheet(v),
-                              icon: const Icon(Icons.shopping_bag_outlined),
-                              label: const Text('Bestel'),
-                            ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(
+                                      0xFF14B8A6,
+                                    ).withOpacity(0.9),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Restaurant openen komt binnenkort',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.store_mall_directory),
+                                  label: const Text('Restaurant'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(
+                                      color: Colors.white,
+                                      width: 1.2,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Toevoegen komt binnenkort',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Toevoegen'),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
