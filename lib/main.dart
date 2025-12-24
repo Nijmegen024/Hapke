@@ -1557,7 +1557,7 @@ class _AccountTabState extends State<_AccountTab> {
             ),
           ),
           icon: const Icon(Icons.login),
-          label: const Text('Inloggen / Aanmelden'),
+          label: const Text('Inloggen / Aanmelden (e-mailcode)'),
         ),
       );
     }
@@ -5298,6 +5298,11 @@ class _EmailCodeLoginPageState extends State<EmailCodeLoginPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const Text(
+              'Log in of maak een account aan met een 6-cijferige code die we naar je e-mail sturen. Geen wachtwoord nodig.',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _emailCtrl,
               decoration: const InputDecoration(
