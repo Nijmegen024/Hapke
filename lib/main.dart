@@ -1221,7 +1221,9 @@ class _RootTabsState extends State<_RootTabs> {
   Future<void> _openLogin() async {
     final result = await Navigator.of(
       context,
-    ).push<AuthSession>(MaterialPageRoute(builder: (_) => const LoginPage()));
+    ).push<AuthSession>(
+      MaterialPageRoute(builder: (_) => const EmailCodeLoginPage()),
+    );
     if (result != null) {
       widget.onLoggedIn(result);
     }
@@ -5164,6 +5166,205 @@ class _HapkeDrawer extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EmailCodeLoginPage extends StatefulWidget {
+  const EmailCodeLoginPage({super.key});
+
+  @override
+  State<EmailCodeLoginPage> createState() => _EmailCodeLoginPageState();
+}
+
+class _EmailCodeLoginPageState extends State<EmailCodeLoginPage> {
+  final _emailCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _codeRequested = false;
+  bool _requesting = false;
+  bool _verifying = false;
+  String? _message;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    final email = _emailCtrl.text.trim();
+    final emailOk = RegExp(r'^.+@.+\..+$').hasMatch(email);
+    if (!emailOk) {
+      setState(() => _error = 'Vul een geldig e‑mailadres in');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _message = null;
+      _requesting = true;
+    });
+    try {
+      final res = await apiClient.post(
+        Uri.parse('$apiBase/auth/email/request-code'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      );
+      if (res.statusCode == 200) {
+        setState(() {
+          _codeRequested = true;
+          _message = 'Code verstuurd. Check je mail (10 min geldig).';
+        });
+      } else if (res.statusCode == 429) {
+        setState(() => _error = 'Even wachten, probeer zo opnieuw.');
+      } else {
+        setState(() => _error = 'Kon geen code versturen (${res.statusCode}).');
+      }
+    } catch (e) {
+      setState(() => _error = 'Fout bij versturen code: $e');
+    } finally {
+      setState(() => _requesting = false);
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    if (!_codeRequested) {
+      setState(() => _error = 'Vraag eerst een code aan.');
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
+    final email = _emailCtrl.text.trim();
+    final code = _codeCtrl.text.trim();
+    setState(() {
+      _error = null;
+      _message = null;
+      _verifying = true;
+    });
+    try {
+      final res = await apiClient.post(
+        Uri.parse('$apiBase/auth/email/verify-code'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'code': code}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final token = (data['accessToken'] ?? '').toString();
+        final userJson = data['user'] is Map<String, dynamic>
+            ? data['user'] as Map<String, dynamic>
+            : <String, dynamic>{};
+        if (token.isEmpty || userJson.isEmpty) {
+          setState(() => _error = 'Ongeldige server-respons');
+          return;
+        }
+        final session = AuthSession(
+          token: token,
+          user: HapkeUser(
+            id: (userJson['id'] ?? '').toString(),
+            name: (userJson['name'] ?? '').toString(),
+            email: (userJson['email'] ?? email),
+            phone: (userJson['phone'] ?? '').toString(),
+            address: (userJson['address'] ?? '').toString(),
+            gender: (userJson['gender'] ?? 'Zeg ik liever niet').toString(),
+          ),
+        );
+        if (!mounted) return;
+        Navigator.of(context).pop(session);
+      } else if (res.statusCode == 401) {
+        setState(() => _error = 'Code klopt niet of is verlopen.');
+      } else if (res.statusCode == 410) {
+        setState(() => _error = 'Code verlopen, vraag een nieuwe aan.');
+      } else {
+        setState(() => _error = 'Inloggen mislukt (${res.statusCode}).');
+      }
+    } catch (e) {
+      setState(() => _error = 'Inloggen mislukt: $e');
+    } finally {
+      setState(() => _verifying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Inloggen of account aanmaken')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextFormField(
+              controller: _emailCtrl,
+              decoration: const InputDecoration(
+                labelText: 'E‑mail',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              validator: (v) {
+                final value = v?.trim() ?? '';
+                final emailOk = RegExp(r'^.+@.+\..+$').hasMatch(value);
+                return emailOk ? null : 'Vul een geldig e‑mailadres in';
+              },
+            ),
+            const SizedBox(height: 12),
+            if (_codeRequested) ...[
+              TextFormField(
+                controller: _codeCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Verificatiecode',
+                  hintText: '6 cijfers',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                validator: (v) =>
+                    (v?.trim().length ?? 0) >= 4 ? null : 'Vul de code in',
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_message != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  _message!,
+                  style: const TextStyle(color: Colors.teal),
+                ),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            ElevatedButton(
+              onPressed: _requesting ? null : _requestCode,
+              child: _requesting
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_codeRequested
+                      ? 'Code opnieuw versturen'
+                      : 'Verificatiecode aanvragen'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: !_codeRequested || _verifying ? null : _verifyCode,
+              child: _verifying
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Doorgaan'),
             ),
           ],
         ),
