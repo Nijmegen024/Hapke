@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app_config.dart';
 
@@ -5188,6 +5189,7 @@ class _EmailCodeLoginPageState extends State<EmailCodeLoginPage> {
   bool _codeRequested = false;
   bool _requesting = false;
   bool _verifying = false;
+  bool _googleBusy = false;
   String? _message;
   String? _error;
 
@@ -5196,6 +5198,68 @@ class _EmailCodeLoginPageState extends State<EmailCodeLoginPage> {
     _emailCtrl.dispose();
     _codeCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loginWithGoogle() async {
+    setState(() {
+      _error = null;
+      _message = null;
+      _googleBusy = true;
+    });
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId: AppConfig.googleWebClientId.isNotEmpty
+            ? AppConfig.googleWebClientId
+            : null,
+      );
+      final account = await googleSignIn.signInSilently() ??
+          await googleSignIn.signIn();
+      if (account == null) {
+        setState(() => _error = 'Google inloggen geannuleerd.');
+        return;
+      }
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        setState(() => _error = 'Geen Google token ontvangen.');
+        return;
+      }
+      final res = await apiClient.post(
+        Uri.parse('$apiBase/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'idToken': idToken}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final token = (data['accessToken'] ?? '').toString();
+        final userJson = data['user'] is Map<String, dynamic>
+            ? data['user'] as Map<String, dynamic>
+            : <String, dynamic>{};
+        if (token.isEmpty || userJson.isEmpty) {
+          setState(() => _error = 'Ongeldige server-respons');
+          return;
+        }
+        final session = AuthSession(
+          token: token,
+          user: HapkeUser(
+            id: (userJson['id'] ?? '').toString(),
+            name: (userJson['name'] ?? account.displayName ?? '').toString(),
+            email: (userJson['email'] ?? account.email).toString(),
+            phone: (userJson['phone'] ?? '').toString(),
+            address: (userJson['address'] ?? '').toString(),
+            gender: (userJson['gender'] ?? 'Zeg ik liever niet').toString(),
+          ),
+        );
+        if (!mounted) return;
+        Navigator.of(context).pop(session);
+      } else {
+        setState(() => _error = 'Google login faalde (${res.statusCode}).');
+      }
+    } catch (e) {
+      setState(() => _error = 'Google login fout: $e');
+    } finally {
+      setState(() => _googleBusy = false);
+    }
   }
 
   Future<void> _requestCode() async {
@@ -5370,6 +5434,18 @@ class _EmailCodeLoginPageState extends State<EmailCodeLoginPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Doorgaan'),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              icon: _googleBusy
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.login),
+              label: const Text('Log in met Google'),
+              onPressed: _googleBusy ? null : _loginWithGoogle,
             ),
           ],
         ),
