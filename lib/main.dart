@@ -5355,99 +5355,239 @@ class _EmailCodeLoginPageState extends State<EmailCodeLoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    const bg = Color(0xFF1F1F1F);
+    const card = Color(0xFF141414);
+    const teal = Color(0xFF14B8A6);
+    const orange = Color(0xFFF97316);
     return Scaffold(
-      appBar: AppBar(title: const Text('Inloggen of account aanmaken')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              'Log in of maak een account aan met een 6-cijferige code die we naar je e-mail sturen. Geen wachtwoord nodig.',
-              style: TextStyle(fontSize: 15),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'E‑mail',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                final value = v?.trim() ?? '';
-                final emailOk = RegExp(r'^.+@.+\..+$').hasMatch(value);
-                return emailOk ? null : 'Vul een geldig e‑mailadres in';
-              },
-            ),
-            const SizedBox(height: 12),
-            if (_codeRequested) ...[
-              TextFormField(
-                controller: _codeCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Verificatiecode',
-                  hintText: '6 cijfers',
-                  border: OutlineInputBorder(),
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 6),
+                Center(
+                  child: Container(
+                    width: 60,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                validator: (v) =>
-                    (v?.trim().length ?? 0) >= 4 ? null : 'Vul de code in',
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (_message != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _message!,
-                  style: const TextStyle(color: Colors.teal),
+                const SizedBox(height: 18),
+                const Text(
+                  'Inloggen of account aanmaken',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.red),
+                const SizedBox(height: 18),
+                _AuthButton(
+                  background: Colors.black,
+                  foreground: Colors.white,
+                  label: 'Doorgaan met Apple',
+                  icon: const Icon(Icons.apple, color: Colors.white),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Apple login nog te configureren.'),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ElevatedButton(
-              onPressed: _requesting ? null : _requestCode,
-              child: _requesting
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(_codeRequested
-                      ? 'Code opnieuw versturen'
-                      : 'Verificatiecode aanvragen'),
+                const SizedBox(height: 12),
+                _AuthButton(
+                  background: Colors.white,
+                  foreground: Colors.black87,
+                  label: 'Doorgaan met Google',
+                  icon: _googleBusy
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.g_mobiledata, color: Colors.black),
+                  onTap: _googleBusy ? null : _loginWithGoogle,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: const [
+                    Expanded(child: Divider(color: Colors.white24)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'of',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.white24)),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Doorgaan met e-mailadres',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  decoration: BoxDecoration(
+                    color: card,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: TextFormField(
+                    controller: _emailCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'E-mailadres',
+                      hintStyle: TextStyle(color: Colors.white54),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      final value = v?.trim() ?? '';
+                      final emailOk = RegExp(r'^.+@.+\..+$').hasMatch(value);
+                      return emailOk ? null : 'Vul een geldig e‑mailadres in';
+                    },
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (_codeRequested)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: card,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: TextFormField(
+                      controller: _codeCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'Verificatiecode (6 cijfers)',
+                        hintStyle: TextStyle(color: Colors.white54),
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      validator: (v) =>
+                          (v?.trim().length ?? 0) >= 4 ? null : 'Vul de code in',
+                    ),
+                  ),
+                if (_codeRequested) const SizedBox(height: 8),
+                if (_message != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      _message!,
+                      style: const TextStyle(color: Colors.tealAccent),
+                    ),
+                  ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                _AuthButton(
+                  background: orange,
+                  foreground: Colors.white,
+                  label: _codeRequested
+                      ? 'Verificatiecode opnieuw sturen'
+                      : 'Verificatiecode aanvragen',
+                  icon: const Icon(Icons.mail_outline, color: Colors.white),
+                  onTap: _requesting ? null : _requestCode,
+                  busy: _requesting,
+                ),
+                if (_codeRequested) ...[
+                  const SizedBox(height: 10),
+                  _AuthButton(
+                    background: teal,
+                    foreground: Colors.white,
+                    label: 'Code invoeren',
+                    icon: const Icon(Icons.lock_open, color: Colors.white),
+                    onTap: _verifying ? null : _verifyCode,
+                    busy: _verifying,
+                  ),
+                ],
+                const SizedBox(height: 18),
+                const Text(
+                  'Door verder te gaan, ga je akkoord met onze Algemene voorwaarden en Privacyverklaring.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: !_codeRequested || _verifying ? null : _verifyCode,
-              child: _verifying
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Doorgaan'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthButton extends StatelessWidget {
+  final Color background;
+  final Color foreground;
+  final String label;
+  final Widget icon;
+  final VoidCallback? onTap;
+  final bool busy;
+  const _AuthButton({
+    required this.background,
+    required this.foreground,
+    required this.label,
+    required this.icon,
+    this.onTap,
+    this.busy = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null || busy;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 120),
+      opacity: disabled ? 0.7 : 1,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: disabled ? null : onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                icon,
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: foreground,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              icon: _googleBusy
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.login),
-              label: const Text('Log in met Google'),
-              onPressed: _googleBusy ? null : _loginWithGoogle,
-            ),
-          ],
+          ),
         ),
       ),
     );
