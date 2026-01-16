@@ -187,6 +187,60 @@ class MenuItem {
   });
 }
 
+class DeliveryAddress {
+  final String id;
+  final String street;
+  final String houseNumber;
+  final String postalCode;
+  final String city;
+  final double? lat;
+  final double? lng;
+  final bool isPrimary;
+
+  const DeliveryAddress({
+    required this.id,
+    required this.street,
+    required this.houseNumber,
+    required this.postalCode,
+    required this.city,
+    required this.lat,
+    required this.lng,
+    required this.isPrimary,
+  });
+
+  String get line1 => '$street $houseNumber'.trim();
+  String get line2 => '$postalCode $city'.trim();
+  bool get hasCoords => lat != null && lng != null;
+
+  factory DeliveryAddress.fromJson(Map<String, dynamic> json) {
+    double? parseCoord(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value == null) return null;
+      return double.tryParse(value.toString());
+    }
+
+    return DeliveryAddress(
+      id: (json['id'] ?? '').toString(),
+      street: (json['street'] ?? '').toString(),
+      houseNumber: (json['houseNumber'] ?? '').toString(),
+      postalCode: (json['postalCode'] ?? '').toString(),
+      city: (json['city'] ?? '').toString(),
+      lat: parseCoord(json['lat']),
+      lng: parseCoord(json['lng']),
+      isPrimary: json['isPrimary'] == true,
+    );
+  }
+}
+
+List<DeliveryAddress> _parseDeliveryAddresses(dynamic payload) {
+  if (payload is! List) return const <DeliveryAddress>[];
+  return payload
+      .whereType<Map<String, dynamic>>()
+      .map(DeliveryAddress.fromJson)
+      .where((address) => address.id.isNotEmpty)
+      .toList();
+}
+
 List<MenuItem> _parseMenuItemsFromApi(dynamic rawMenu) {
   if (rawMenu is! List) {
     return const <MenuItem>[];
@@ -580,12 +634,6 @@ final demoRestaurants = <Restaurant>[];
 const Map<String, String> _dishImages = {};
 
 /// ---------------- App root with state ----------------
-class _LocationCoords {
-  final double lat;
-  final double lng;
-  const _LocationCoords(this.lat, this.lng);
-}
-
 class HapkeApp extends StatefulWidget {
   const HapkeApp({super.key});
   @override
@@ -650,6 +698,11 @@ class _HapkeAppState extends State<HapkeApp> {
     _persistSession(session);
     _persistToken(session.token);
     apiClient.setToken(session.token);
+    if (!_hasLocation) {
+      Future.microtask(() async {
+        await _syncLocationFromPrimaryAddress();
+      });
+    }
   }
 
   Future<void> logout() async {
@@ -825,19 +878,53 @@ class _HapkeAppState extends State<HapkeApp> {
           _userLng = lng;
           _needsLocation = false;
         });
-      } else {
-        if (!mounted) return;
-        setState(() => _needsLocation = true);
+        return;
       }
     } catch (e) {
       debugPrint('Kon locatie niet herstellen: $e');
-      if (mounted) {
-        setState(() => _needsLocation = true);
-      }
+    }
+    final synced = await _syncLocationFromPrimaryAddress(
+      reloadRestaurants: false,
+    );
+    if (!synced && mounted) {
+      setState(() => _needsLocation = true);
     }
   }
 
-  Future<void> _saveLocation(double lat, double lng) async {
+  Future<bool> _syncLocationFromPrimaryAddress({
+    bool reloadRestaurants = true,
+  }) async {
+    if (_authToken == null || _authToken!.isEmpty) return false;
+    try {
+      final res = await apiClient.get(
+        Uri.parse('$apiBase/users/addresses'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode != 200) return false;
+      final addresses = _parseDeliveryAddresses(jsonDecode(res.body));
+      if (addresses.isEmpty) return false;
+      final primary = addresses.firstWhere(
+        (a) => a.isPrimary,
+        orElse: () => addresses.first,
+      );
+      if (!primary.hasCoords) return false;
+      await _saveLocation(
+        primary.lat!,
+        primary.lng!,
+        reloadRestaurants: reloadRestaurants,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Kon bezorgadressen niet ophalen: $e');
+      return false;
+    }
+  }
+
+  Future<void> _saveLocation(
+    double lat,
+    double lng, {
+    bool reloadRestaurants = true,
+  }) async {
     setState(() {
       _userLat = lat;
       _userLng = lng;
@@ -849,98 +936,39 @@ class _HapkeAppState extends State<HapkeApp> {
     } catch (e) {
       debugPrint('Kon locatie niet bewaren: $e');
     }
-    await _loadRestaurants();
+    if (reloadRestaurants) {
+      await _loadRestaurants();
+    }
   }
 
   Future<bool> _requestLocation() async {
+    return _openDeliveryAddresses();
+  }
+
+  Future<bool> _openDeliveryAddresses() async {
     final ctx = appNavigatorKey.currentContext;
     if (ctx == null) return false;
-    final latCtrl = TextEditingController(
-      text: _userLat != null ? _userLat!.toStringAsFixed(6) : '',
-    );
-    final lngCtrl = TextEditingController(
-      text: _userLng != null ? _userLng!.toStringAsFixed(6) : '',
-    );
-    String? error;
-    final result = await showDialog<_LocationCoords>(
-      context: ctx,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            Future<void> submit() async {
-              final lat = double.tryParse(
-                latCtrl.text.trim().replaceAll(',', '.'),
-              );
-              final lng = double.tryParse(
-                lngCtrl.text.trim().replaceAll(',', '.'),
-              );
-              if (lat == null || lng == null) {
-                setDialogState(() {
-                  error = 'Vul geldige cijfers in.';
-                });
-                return;
-              }
-              Navigator.of(dialogCtx).pop(_LocationCoords(lat, lng));
+    if (_user == null) {
+      final session = await Navigator.of(ctx).push<AuthSession>(
+        MaterialPageRoute(builder: (_) => const EmailCodeLoginPage()),
+      );
+      if (session != null) {
+        setSession(session);
+      }
+    }
+    if (_user == null) return false;
+    await Navigator.of(ctx).push(
+      MaterialPageRoute(
+        builder: (_) => DeliveryAddressesPage(
+          onLocationSelected: (address) async {
+            if (address.hasCoords) {
+              await _saveLocation(address.lat!, address.lng!);
             }
-
-            return AlertDialog(
-              title: const Text('Locatie instellen'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Vul je latitude en longitude in om restaurants te zien.',
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: latCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Latitude',
-                      hintText: '52.0907',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: lngCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Longitude',
-                      hintText: '5.1214',
-                    ),
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 8),
-                    Text(error!, style: const TextStyle(color: Colors.red)),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogCtx).pop(),
-                  child: const Text('Annuleren'),
-                ),
-                ElevatedButton(
-                  onPressed: submit,
-                  child: const Text('Opslaan'),
-                ),
-              ],
-            );
           },
-        );
-      },
+        ),
+      ),
     );
-    latCtrl.dispose();
-    lngCtrl.dispose();
-    if (result == null) return false;
-    await _saveLocation(result.lat, result.lng);
-    return true;
+    return _hasLocation;
   }
 
   Future<void> _loadRestaurants() async {
@@ -1106,6 +1134,9 @@ class _HapkeAppState extends State<HapkeApp> {
       userLat: _userLat,
       userLng: _userLng,
       onRequestLocation: _requestLocation,
+      onManageAddresses: () async {
+        await _openDeliveryAddresses();
+      },
       onOrderPlaced: _handleOrderPlaced,
       pendingOrderId: _pendingOrderId,
       onTrackingCompleted: _handleOrderDelivered,
@@ -1217,6 +1248,7 @@ class _RootTabs extends StatefulWidget {
   final double? userLat;
   final double? userLng;
   final Future<bool> Function() onRequestLocation;
+  final Future<void> Function() onManageAddresses;
   final Future<void> Function(OrderSummary summary) onOrderPlaced;
   final Future<void> Function(String orderId) onTrackingCompleted;
   final String? pendingOrderId;
@@ -1236,6 +1268,7 @@ class _RootTabs extends StatefulWidget {
     required this.userLat,
     required this.userLng,
     required this.onRequestLocation,
+    required this.onManageAddresses,
     required this.onOrderPlaced,
     required this.onTrackingCompleted,
     required this.pendingOrderId,
@@ -1470,6 +1503,7 @@ class _RootTabsState extends State<_RootTabs> {
         user: widget.currentUser,
         onLogin: _openLogin,
         onLogout: widget.onLogout,
+        onManageAddresses: widget.onManageAddresses,
       ),
     ];
 
@@ -1515,10 +1549,12 @@ class _AccountTab extends StatefulWidget {
   final HapkeUser? user;
   final VoidCallback onLogin;
   final Future<void> Function()? onLogout;
+  final Future<void> Function() onManageAddresses;
   const _AccountTab({
     required this.user,
     required this.onLogin,
     required this.onLogout,
+    required this.onManageAddresses,
   });
 
   @override
@@ -1944,13 +1980,8 @@ class _AccountTabState extends State<_AccountTab> {
                   child: _buildQuickAction(
                     icon: Icons.location_on_outlined,
                     title: 'Bezorgadressen',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Adressen beheren komt eraan'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
+                    onTap: () async {
+                      await widget.onManageAddresses();
                     },
                   ),
                 ),
@@ -2042,6 +2073,460 @@ class _AccountTabState extends State<_AccountTab> {
       ),
     );
   }
+}
+
+class DeliveryAddressesPage extends StatefulWidget {
+  final Future<void> Function(DeliveryAddress address) onLocationSelected;
+  const DeliveryAddressesPage({super.key, required this.onLocationSelected});
+
+  @override
+  State<DeliveryAddressesPage> createState() => _DeliveryAddressesPageState();
+}
+
+class _DeliveryAddressesPageState extends State<DeliveryAddressesPage> {
+  static const Color primaryColor = Color(0xFF2AAAB3);
+  static const Color mutedColor = Color(0xFF6F7F99);
+
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+  List<DeliveryAddress> _addresses = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await apiClient.get(
+        Uri.parse('$apiBase/users/addresses'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode != 200) {
+        throw Exception(extractErrorMessage(res));
+      }
+      final decoded = jsonDecode(res.body);
+      final addresses = _parseDeliveryAddresses(decoded);
+      if (!mounted) return;
+      setState(() {
+        _addresses = addresses;
+      });
+      await _notifyPrimaryLocation(addresses);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Adressen ophalen mislukt: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _notifyPrimaryLocation(List<DeliveryAddress> addresses) async {
+    if (addresses.isEmpty) return;
+    final primary = addresses.firstWhere(
+      (address) => address.isPrimary,
+      orElse: () => addresses.first,
+    );
+    if (!primary.hasCoords) return;
+    await widget.onLocationSelected(primary);
+  }
+
+  Future<void> _createOrEditAddress({DeliveryAddress? existing}) async {
+    if (_saving) return;
+    final draft = await _openAddressDialog(existing: existing);
+    if (draft == null) return;
+    setState(() => _saving = true);
+    try {
+      final uri = existing == null
+          ? Uri.parse('$apiBase/users/addresses')
+          : Uri.parse('$apiBase/users/addresses/${existing.id}');
+      final body = jsonEncode({
+        'street': draft.street,
+        'houseNumber': draft.houseNumber,
+        'postalCode': draft.postalCode,
+        'city': draft.city,
+      });
+      final res = existing == null
+          ? await apiClient.post(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: body,
+            )
+          : await apiClient.patch(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: body,
+            );
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        throw Exception(extractErrorMessage(res));
+      }
+      await _loadAddresses();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            existing == null
+                ? 'Adres toegevoegd'
+                : 'Adres bijgewerkt',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Opslaan mislukt: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Future<void> _setPrimary(DeliveryAddress address) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final res = await apiClient.patch(
+        Uri.parse('$apiBase/users/addresses/${address.id}/primary'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode != 200) {
+        throw Exception(extractErrorMessage(res));
+      }
+      await _loadAddresses();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Primair instellen mislukt: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _deleteAddress(DeliveryAddress address) async {
+    if (_saving) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Adres verwijderen'),
+        content: Text('Weet je zeker dat je ${address.line1} wilt verwijderen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Annuleren'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Verwijderen'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _saving = true);
+    try {
+      final res = await apiClient.delete(
+        Uri.parse('$apiBase/users/addresses/${address.id}'),
+        headers: {'Accept': 'application/json'},
+      );
+      if (res.statusCode != 204) {
+        throw Exception(extractErrorMessage(res));
+      }
+      await _loadAddresses();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Verwijderen mislukt: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<_AddressDraft?> _openAddressDialog({
+    DeliveryAddress? existing,
+  }) async {
+    final streetCtrl = TextEditingController(text: existing?.street ?? '');
+    final houseCtrl =
+        TextEditingController(text: existing?.houseNumber ?? '');
+    final postalCtrl =
+        TextEditingController(text: existing?.postalCode ?? '');
+    final cityCtrl = TextEditingController(text: existing?.city ?? '');
+    String? error;
+
+    final result = await showDialog<_AddressDraft>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            void submit() {
+              final street = streetCtrl.text.trim();
+              final houseNumber = houseCtrl.text.trim();
+              final postalCode = postalCtrl.text.trim();
+              final city = cityCtrl.text.trim();
+              final postalOk = RegExp(
+                r'^[1-9][0-9]{3}\s?[A-Za-z]{2}$',
+              ).hasMatch(postalCode);
+              if (street.isEmpty ||
+                  houseNumber.isEmpty ||
+                  city.isEmpty ||
+                  !postalOk) {
+                setDialogState(() {
+                  error = 'Vul een geldig adres in (postcode 1234 AB).';
+                });
+                return;
+              }
+              Navigator.of(dialogCtx).pop(
+                _AddressDraft(
+                  street: street,
+                  houseNumber: houseNumber,
+                  postalCode: postalCode,
+                  city: city,
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: Text(existing == null ? 'Adres toevoegen' : 'Adres aanpassen'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: streetCtrl,
+                      decoration: const InputDecoration(labelText: 'Straat'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: houseCtrl,
+                      decoration:
+                          const InputDecoration(labelText: 'Huisnummer'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: postalCtrl,
+                      decoration:
+                          const InputDecoration(labelText: 'Postcode'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: cityCtrl,
+                      decoration: const InputDecoration(labelText: 'Plaats'),
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(error!, style: const TextStyle(color: Colors.red)),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Annuleren'),
+                ),
+                ElevatedButton(
+                  onPressed: submit,
+                  child: const Text('Opslaan'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    streetCtrl.dispose();
+    houseCtrl.dispose();
+    postalCtrl.dispose();
+    cityCtrl.dispose();
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Bezorgadressen'),
+        actions: [
+          IconButton(
+            onPressed: _saving ? null : () => _createOrEditAddress(),
+            icon: const Icon(Icons.add),
+            tooltip: 'Adres toevoegen',
+          ),
+        ],
+      ),
+      body: Container(
+        color: const Color(0xFFF4F7FB),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _addresses.isEmpty
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_on_outlined,
+                          size: 48, color: Colors.black38),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Voeg een bezorgadres toe om restaurants in jouw buurt te zien.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: _saving ? null : () => _createOrEditAddress(),
+                        child: const Text('Adres toevoegen'),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        Text(_error!, style: const TextStyle(color: Colors.red)),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(_error!,
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                  ..._addresses.map(_buildAddressCard),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildAddressCard(DeliveryAddress address) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 42,
+            width: 42,
+            decoration: BoxDecoration(
+              color: primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.location_on_outlined, color: primaryColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  address.line1,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(address.line2, style: const TextStyle(color: mutedColor)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (address.isPrimary)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Text(
+                          'Primair',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    if (!address.isPrimary) ...[
+                      TextButton(
+                        onPressed: _saving ? null : () => _setPrimary(address),
+                        child: const Text('Primair maken'),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            children: [
+              IconButton(
+                onPressed:
+                    _saving ? null : () => _createOrEditAddress(existing: address),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Aanpassen',
+              ),
+              IconButton(
+                onPressed: _saving ? null : () => _deleteAddress(address),
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Verwijderen',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddressDraft {
+  final String street;
+  final String houseNumber;
+  final String postalCode;
+  final String city;
+
+  const _AddressDraft({
+    required this.street,
+    required this.houseNumber,
+    required this.postalCode,
+    required this.city,
+  });
 }
 
 class LocationSettingsResult {
@@ -2723,7 +3208,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Vul je locatie in om restaurants in jouw buurt te zien.',
+                        'Vul je bezorgadres in om restaurants in jouw buurt te zien.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 16,
@@ -2734,7 +3219,7 @@ class _HomePageState extends State<HomePage> {
                       ElevatedButton.icon(
                         onPressed: () => widget.onRequestLocation(),
                         icon: const Icon(Icons.my_location),
-                        label: const Text('Locatie instellen'),
+                        label: const Text('Bezorgadres instellen'),
                       ),
                     ],
                   ),
