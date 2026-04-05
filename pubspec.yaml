@@ -39,6 +39,7 @@ dependencies:
   url_launcher: ^6.3.0
   video_player: ^2.9.1
   google_sign_in: ^6.2.1
+  get: ^4.7.3
 
 dev_dependencies:
   flutter_test:

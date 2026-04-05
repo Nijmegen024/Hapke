@@ -1,0 +1,131 @@
+Analyzing Hapke...                                              
+
+warning • The include file 'package:flutter_lints/flutter.yaml' in '/Users/mapmac/Developer/Fiverr/Coming/hapke024/hapke-og-source/Hapke/ios-bak/analysis_options.yaml' can't be found when analyzing '/Users/mapmac/Developer/Fiverr/Coming/hapke024/hapke-og-source/Hapke/ios-bak' • ios-bak/analysis_options.yaml:10:10 • include_file_not_found
+  error • Undefined name 'authTokenKey' • lib/main.dart:61:49 • undefined_identifier
+  error • Undefined name 'authUserKey' • lib/main.dart:62:52 • undefined_identifier
+  error • The method 'fromJson' isn't defined for the type 'HapkeUser' • lib/main.dart:65:32 • undefined_method
+  error • Undefined name 'authTokenKey' • lib/main.dart:79:38 • undefined_identifier
+  error • Undefined name 'authUserKey' • lib/main.dart:81:14 • undefined_identifier
+  error • The method 'toJson' isn't defined for the type 'HapkeUser' • lib/main.dart:82:40 • undefined_method
+  error • Undefined name 'authTokenKey' • lib/main.dart:86:39 • undefined_identifier
+  error • Undefined name 'authUserKey' • lib/main.dart:87:39 • undefined_identifier
+  error • The named parameter 'authToken' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'cartItems' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'cartTotalCents' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'loadingRestaurants' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'locationRequired' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onAdd' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onClear' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onLoggedIn' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onManageAddresses' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onOrderPlaced' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onRequestLocation' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onTrackingCompleted' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'onUpdateQty' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'pendingOrderId' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'restaurants' is required, but there's no corresponding argument • lib/main.dart:118:12 • missing_required_argument
+  error • The named parameter 'cart' isn't defined • lib/main.dart:120:7 • undefined_named_parameter
+  error • The named parameter 'onLocationChanged' isn't defined • lib/main.dart:123:7 • undefined_named_parameter
+  error • The named parameter 'onCartChanged' isn't defined • lib/main.dart:124:7 • undefined_named_parameter
+  error • The named parameter 'onLogin' isn't defined • lib/main.dart:125:7 • undefined_named_parameter
+   info • Use the null-aware operator '?.' rather than an explicit 'null' comparison • lib/models/friend.dart:11:13 • prefer_null_aware_operators
+   info • Use the null-aware operator '?.' rather than an explicit 'null' comparison • lib/models/friend.dart:90:13 • prefer_null_aware_operators
+   info • Use the null-aware operator '?.' rather than an explicit 'null' comparison • lib/models/friend.dart:95:21 • prefer_null_aware_operators
+  error • The name 'MenuItem' isn't a type, so it can't be used as a type argument • lib/models/restaurant.dart:8:14 • non_type_as_type_argument
+warning • Unused import: '../core/constants.dart' • lib/network/api_client.dart:5:8 • unused_import
+   info • Use interpolation to compose strings and values • lib/network/api_helpers.dart:48:37 • prefer_interpolation_to_compose_strings
+   info • Unnecessary use of 'toList' in a spread • lib/screens/account/restaurant_poll_page.dart:191:16 • unnecessary_to_list_in_spreads
+  error • Undefined name 'AppConfig' • lib/screens/auth/email_code_login_page.dart:44:19 • undefined_identifier
+  error • Undefined name 'AppConfig' • lib/screens/auth/email_code_login_page.dart:45:15 • undefined_identifier
+  error • The property 'id' can't be unconditionally accessed because the receiver can be 'null' • lib/screens/cart_page.dart:23:18 • unchecked_use_of_nullable_value
+  error • A value of type 'double' can't be assigned to a variable of type 'int' • lib/screens/cart_page.dart:26:16 • invalid_assignment
+  error • The property 'id' can't be unconditionally accessed because the receiver can be 'null' • lib/screens/cart_page.dart:35:56 • unchecked_use_of_nullable_value
+  error • The argument type 'double' can't be assigned to the parameter type 'int'.  • lib/screens/cart_page.dart:158:47 • argument_type_not_assignable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/chat_page.dart:179:139 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/chat_page.dart:181:113 • deprecated_member_use
+warning • The value of the field '_error' isn't used • lib/screens/friends_tab.dart:24:11 • unused_field
+warning • Unused import: 'dart:convert' • lib/screens/home_page.dart:1:8 • unused_import
+warning • Unused import: '../network/api_client.dart' • lib/screens/home_page.dart:9:8 • unused_import
+  error • The named parameter 'cart' is required, but there's no corresponding argument • lib/screens/home_page.dart:73:25 • missing_required_argument
+  error • The named parameter 'onCartChanged' is required, but there's no corresponding argument • lib/screens/home_page.dart:73:25 • missing_required_argument
+  error • The named parameter 'cartItems' isn't defined • lib/screens/home_page.dart:75:11 • undefined_named_parameter
+  error • The named parameter 'onAdd' isn't defined • lib/screens/home_page.dart:76:11 • undefined_named_parameter
+  error • The named parameter 'openCartModal' isn't defined • lib/screens/home_page.dart:86:11 • undefined_named_parameter
+   info • Use interpolation to compose strings and values • lib/screens/home_page.dart:395:55 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values • lib/screens/home_page.dart:418:61 • prefer_interpolation_to_compose_strings
+  error • The getter 'restaurantName' isn't defined for the type 'OrderSummary' • lib/screens/order_tracking_page.dart:97:27 • undefined_getter
+warning • Unused import: 'package:http/http.dart' • lib/screens/payment_method_page.dart:3:8 • unused_import
+warning • Unused import: 'dart:convert' • lib/screens/restaurant_detail_page.dart:1:8 • unused_import
+warning • Unused import: '../../network/api_client.dart' • lib/screens/restaurant_detail_page.dart:5:8 • unused_import
+warning • Unused import: '../../core/constants.dart' • lib/screens/restaurant_detail_page.dart:7:8 • unused_import
+warning • Unused import: '../../widgets/badge_widget.dart' • lib/screens/restaurant_detail_page.dart:10:8 • unused_import
+  error • The property 'id' can't be unconditionally accessed because the receiver can be 'null' • lib/screens/restaurant_detail_page.dart:51:18 • unchecked_use_of_nullable_value
+  error • A value of type 'double' can't be assigned to a variable of type 'int' • lib/screens/restaurant_detail_page.dart:54:16 • invalid_assignment
+  error • The argument type 'double' can't be assigned to the parameter type 'int'.  • lib/screens/restaurant_detail_page.dart:131:53 • argument_type_not_assignable
+  error • The named parameter 'description' is required, but there's no corresponding argument • lib/screens/restaurant_detail_page.dart:147:24 • missing_required_argument
+  error • The named parameter 'imageUrl' is required, but there's no corresponding argument • lib/screens/restaurant_detail_page.dart:147:24 • missing_required_argument
+  error • The named parameter 'name' is required, but there's no corresponding argument • lib/screens/restaurant_detail_page.dart:147:24 • missing_required_argument
+  error • The named parameter 'price' is required, but there's no corresponding argument • lib/screens/restaurant_detail_page.dart:147:24 • missing_required_argument
+  error • The named parameter 'item' isn't defined • lib/screens/restaurant_detail_page.dart:148:19 • undefined_named_parameter
+  error • The named parameter 'count' isn't defined • lib/screens/restaurant_detail_page.dart:149:19 • undefined_named_parameter
+  error • The named parameter 'onRemove' isn't defined • lib/screens/restaurant_detail_page.dart:151:19 • undefined_named_parameter
+  error • Target of URI doesn't exist: 'friends/friends_tab.dart' • lib/screens/root_tabs.dart:15:8 • uri_does_not_exist
+  error • Target of URI doesn't exist: 'videos/videos_tab.dart' • lib/screens/root_tabs.dart:16:8 • uri_does_not_exist
+   info • Don't use 'BuildContext's across async gaps • lib/screens/root_tabs.dart:127:39 • use_build_context_synchronously
+  error • The named parameter 'cart' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:129:25 • missing_required_argument
+  error • The named parameter 'restaurant' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:129:25 • missing_required_argument
+  error • The named parameter 'items' isn't defined • lib/screens/root_tabs.dart:130:11 • undefined_named_parameter
+  error • The named parameter 'authToken' isn't defined • lib/screens/root_tabs.dart:132:11 • undefined_named_parameter
+  error • The named parameter 'email' isn't defined • lib/screens/root_tabs.dart:133:11 • undefined_named_parameter
+  error • The named parameter 'deliveryLat' isn't defined • lib/screens/root_tabs.dart:134:11 • undefined_named_parameter
+  error • The named parameter 'deliveryLng' isn't defined • lib/screens/root_tabs.dart:135:11 • undefined_named_parameter
+  error • The named parameter 'orderId' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:146:25 • missing_required_argument
+  error • The named parameter 'summary' isn't defined • lib/screens/root_tabs.dart:147:11 • undefined_named_parameter
+  error • The named parameter 'onTrack' isn't defined • lib/screens/root_tabs.dart:148:11 • undefined_named_parameter
+  error • The named parameter 'authToken' isn't defined • lib/screens/root_tabs.dart:170:11 • undefined_named_parameter
+  error • The named parameter 'initialStatus' isn't defined • lib/screens/root_tabs.dart:171:11 • undefined_named_parameter
+  error • The named parameter 'initialEtaMinutes' isn't defined • lib/screens/root_tabs.dart:172:11 • undefined_named_parameter
+  error • The named parameter 'initialSteps' isn't defined • lib/screens/root_tabs.dart:173:11 • undefined_named_parameter
+  error • The named parameter 'onDelivered' isn't defined • lib/screens/root_tabs.dart:174:11 • undefined_named_parameter
+  error • The named parameter 'onOrderMissing' isn't defined • lib/screens/root_tabs.dart:177:11 • undefined_named_parameter
+  error • The named parameter 'onConnectionError' isn't defined • lib/screens/root_tabs.dart:185:11 • undefined_named_parameter
+  error • The named parameter 'cart' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:202:25 • missing_required_argument
+  error • The named parameter 'onCartChanged' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:202:25 • missing_required_argument
+  error • The named parameter 'restaurant' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:202:25 • missing_required_argument
+  error • The named parameter 'items' isn't defined • lib/screens/root_tabs.dart:203:11 • undefined_named_parameter
+  error • The named parameter 'totalCents' isn't defined • lib/screens/root_tabs.dart:204:11 • undefined_named_parameter
+  error • The named parameter 'onUpdateQty' isn't defined • lib/screens/root_tabs.dart:208:11 • undefined_named_parameter
+  error • The named parameter 'onCheckout' isn't defined • lib/screens/root_tabs.dart:209:11 • undefined_named_parameter
+  error • The named parameter 'onClear' isn't defined • lib/screens/root_tabs.dart:210:11 • undefined_named_parameter
+  error • The named parameter 'cart' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:219:25 • missing_required_argument
+  error • The named parameter 'onCartChanged' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:219:25 • missing_required_argument
+  error • The named parameter 'onAdd' isn't defined • lib/screens/root_tabs.dart:221:11 • undefined_named_parameter
+  error • The named parameter 'openCartModal' isn't defined • lib/screens/root_tabs.dart:222:11 • undefined_named_parameter
+  error • The named parameter 'cartItems' isn't defined • lib/screens/root_tabs.dart:223:11 • undefined_named_parameter
+  error • The method 'VideosTab' isn't defined for the type '_RootTabsState' • lib/screens/root_tabs.dart:268:7 • undefined_method
+  error • The named parameter 'cart' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:276:7 • missing_required_argument
+  error • The named parameter 'onCartChanged' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:276:7 • missing_required_argument
+  error • The named parameter 'restaurant' is required, but there's no corresponding argument • lib/screens/root_tabs.dart:276:7 • missing_required_argument
+  error • The named parameter 'items' isn't defined • lib/screens/root_tabs.dart:277:9 • undefined_named_parameter
+  error • The named parameter 'totalCents' isn't defined • lib/screens/root_tabs.dart:278:9 • undefined_named_parameter
+  error • The named parameter 'onUpdateQty' isn't defined • lib/screens/root_tabs.dart:282:9 • undefined_named_parameter
+  error • The named parameter 'onCheckout' isn't defined • lib/screens/root_tabs.dart:283:9 • undefined_named_parameter
+  error • The named parameter 'onClear' isn't defined • lib/screens/root_tabs.dart:284:9 • undefined_named_parameter
+  error • The method 'FriendsTab' isn't defined for the type '_RootTabsState' • lib/screens/root_tabs.dart:286:7 • undefined_method
+   info • The private field _ordering could be 'final' • lib/screens/videos_tab.dart:46:8 • prefer_final_fields
+warning • The value of the field '_ordering' isn't used • lib/screens/videos_tab.dart:46:8 • unused_field
+warning • The value of the field '_orderSuccess' isn't used • lib/screens/videos_tab.dart:47:11 • unused_field
+   info • Don't use 'BuildContext's across async gaps • lib/screens/videos_tab.dart:560:38 • use_build_context_synchronously
+warning • The '!' will have no effect because the receiver can't be null • lib/screens/videos_tab.dart:578:105 • unnecessary_non_null_assertion
+   info • Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check • lib/screens/videos_tab.dart:663:30 • use_build_context_synchronously
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/videos_tab.dart:831:110 • deprecated_member_use
+   info • Statements in an if should be enclosed in a block • lib/screens/videos_tab.dart:834:92 • curly_braces_in_flow_control_structures
+   info • Statements in an if should be enclosed in a block • lib/screens/videos_tab.dart:835:44 • curly_braces_in_flow_control_structures
+  error • The property 'id' can't be unconditionally accessed because the receiver can be 'null' • lib/screens/videos_tab.dart:847:86 • unchecked_use_of_nullable_value
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/videos_tab.dart:886:29 • deprecated_member_use
+   info • Unnecessary braces in a string interpolation • lib/widgets/hapke_drawer.dart:47:38 • unnecessary_brace_in_string_interps
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/menu_item_card.dart:50:41 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/menu_item_card.dart:95:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/widgets/round_icon_button.dart:22:24 • deprecated_member_use
+
+127 issues found. (ran in 1.6s)
